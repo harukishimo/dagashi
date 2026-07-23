@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.0",
+  "name": "dagashi_business_plan_denylist",
+  "description": "L3無人実行から除外し、人間キューへ昇格する条件を定義する。",
+  "default_action": "human_queue",
+  "applies_to": {
+    "level": "L3",
+    "rule": "L判定時にこのJSONを確認し、matchesがtrueの項目がある場合はL3を禁止する。"
+  },
+  "match_policy": {
+    "case_sensitive": false,
+    "match_any_category": true,
+    "on_uncertain_match": "human_queue"
+  },
+  "categories": [
+    {
+      "id": "business_decision",
+      "name": "事業判断",
+      "action": "human_queue",
+      "items": [
+        {
+          "id": "business_goal_or_intent_change",
+          "description": "事業目的、上位ゴール、Intentの変更",
+          "keywords": ["事業目的", "上位ゴール", "Intent", "ゴール定義"]
+        },
+        {
+          "id": "final_business_decision",
+          "description": "Why、提供価値、対象者、商品構成、価格、収支、実証実験条件の最終決定",
+          "keywords": ["Why", "提供価値", "対象者", "商品構成", "価格", "収支", "実証実験", "最終決定"]
+        },
+        {
+          "id": "stakeholder_policy_finalization",
+          "description": "施設、保護者、地域団体、行政、協力者への説明方針の確定",
+          "keywords": ["施設", "保護者", "地域団体", "行政", "協力者", "説明方針", "確定"]
+        },
+        {
+          "id": "external_business_document_finalization",
+          "description": "事業計画書の外部提出版、営業資料、交渉資料の確定",
+          "keywords": ["外部提出版", "営業資料", "交渉資料", "確定版"]
+        }
+      ]
+    },
+    {
+      "id": "legal_hygiene_safety",
+      "name": "法規制・衛生・安全",
+      "action": "human_queue",
+      "items": [
+        {
+          "id": "license_or_notification_decision",
+          "description": "営業許可または営業届出の要否判断",
+          "keywords": ["営業許可", "営業届出", "要否判断"]
+        },
+        {
+          "id": "health_center_consultation_decision",
+          "description": "保健所相談の要否判断",
+          "keywords": ["保健所", "相談", "要否判断"]
+        },
+        {
+          "id": "haccp_or_hygiene_management_decision",
+          "description": "HACCPまたは衛生管理の扱いの確定",
+          "keywords": ["HACCP", "衛生管理", "確定"]
+        },
+        {
+          "id": "food_handling_scope_finalization",
+          "description": "包装済み菓子のみか、小分け、開封、詰め替え、調理、配布を含むかの確定",
+          "keywords": ["包装済み", "小分け", "開封", "詰め替え", "調理", "配布", "確定"]
+        },
+        {
+          "id": "food_storage_traceability_finalization",
+          "description": "賞味期限、保管温度、仕入れ記録、回収、廃棄の運用確定",
+          "keywords": ["賞味期限", "保管温度", "仕入れ記録", "回収", "廃棄", "運用確定"]
+        },
+        {
+          "id": "food_labeling_allergy_finalization",
+          "description": "食品表示、アレルゲン表示、アレルギー対応の確定",
+          "keywords": ["食品表示", "アレルゲン", "アレルギー", "確定"]
+        },
+        {
+          "id": "child_safety_operations_finalization",
+          "description": "子どもの安全、保護者同意、緊急連絡、事故対応、保険、写真・個人情報、現金管理の確定",
+          "keywords": ["子ども", "安全", "保護者同意", "緊急連絡", "事故対応", "保険", "写真", "個人情報", "現金管理", "確定"]
+        },
+        {
+          "id": "responsibility_boundary_finalization",
+          "description": "施設側と運営側の責任分界の確定",
+          "keywords": ["責任分界", "施設側", "運営側", "確定"]
+        }
+      ]
+    },
+    {
+      "id": "external_side_effects",
+      "name": "外部副作用",
+      "action": "human_queue",
+      "items": [
+        {
+          "id": "pull_request_merge",
+          "description": "PR merge",
+          "keywords": ["PR merge", "merge", "マージ"]
+        },
+        {
+          "id": "git_push",
+          "description": "git push",
+          "keywords": ["git push", "push"]
+        },
+        {
+          "id": "github_issue_state_change",
+          "description": "GitHub Issueのclose、label、assignee、Status変更",
+          "keywords": ["Issue close", "close", "label", "assignee", "Status変更"]
+        },
+        {
+          "id": "external_publish_or_share",
+          "description": "外部サービスへの送信、公開、共有",
+          "keywords": ["送信", "公開", "共有", "外部サービス"]
+        },
+        {
+          "id": "external_contact_or_application",
+          "description": "メール、チャット、フォーム、申請、予約、問い合わせの送信",
+          "keywords": ["メール", "チャット", "フォーム", "申請", "予約", "問い合わせ", "送信"]
+        }
+      ]
+    },
+    {
+      "id": "data_security",
+      "name": "データ・セキュリティ",
+      "action": "human_queue",
+      "items": [
+        {
+          "id": "personal_or_child_data",
+          "description": "個人情報、子どもの情報、写真、連絡先、同意情報を扱う変更",
+          "keywords": ["個人情報", "子どもの情報", "写真", "連絡先", "同意情報"]
+        },
+        {
+          "id": "secret_or_credential",
+          "description": "secret、token、認証情報、環境変数を扱う変更",
+          "keywords": ["secret", "token", "認証情報", "環境変数"]
+        },
+        {
+          "id": "destructive_or_permission_change",
+          "description": "ファイル削除、履歴改変、権限変更、設定変更",
+          "keywords": ["ファイル削除", "履歴改変", "権限変更", "設定変更"]
+        },
+        {
+          "id": "dependency_ci_deploy_change",
+          "description": "依存関係、CI、デプロイ、実行環境に影響する変更",
+          "keywords": ["依存関係", "CI", "デプロイ", "実行環境"]
+        }
+      ]
+    }
+  ]
+}

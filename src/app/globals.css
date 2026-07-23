@@ -1,0 +1,84 @@
+:root {
+  --child-canvas: #fff8e8;
+  --surface: #ffffff;
+  --surface-sunken: #f4efe3;
+  --ink: #25231f;
+  --ink-muted: #625f57;
+  --border: #d8d2c4;
+  --border-strong: #a9a294;
+  --primary: #176b4d;
+  --primary-hover: #10543c;
+  --primary-soft: #ddf2e8;
+  --accent: #c9472b;
+  --accent-soft: #fbe5de;
+  --sun: #f2c94c;
+  --sun-soft: #fff1c2;
+  --info: #205aa7;
+  --focus: #5b37d1;
+  --admin-canvas: #f4f6f8;
+  --admin-nav: #1d2940;
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+  padding: 16px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+}
+
+input[type="password"] {
+  min-height: 56px;
+  margin: 8px 0 16px;
+  padding: 12px 16px;
+  border: 2px solid var(--border-strong);
+  border-radius: 12px;
+}
+
+body {
+  margin: 0;
+  background: var(--child-canvas);
+  color: var(--ink);
+  font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -31,16 +31,16 @@
 | 項目 | 内容 |
 |---|---|
 | project_goal | 駄菓子事業計画書初版を作成する |
-| current_phase | #16 初版ドラフトL2レビュー済み / Integration Ready / PR未作成 |
+| current_phase | #17 最終レビューL1完了 / 事業計画書初版Pass / 親Issue #1 completed |
 | active_loop_patterns | `daily_triage`, `pr_babysitter` |
-| current_branch | codex/issue-16-business-plan-draft-l2 |
+| current_branch | codex/issue-17-final-review-l1 |
 | github_repo | `git@github.com:harukishimo/dagashi_jigyo.git` |
 | current_control_stage | none |
-| current_run_id | LOG-047 |
+| current_run_id | LOG-051 |
 | last_decision_by | Human / Orchestrator |
-| next_target | #16をPR化する。PR作成前に実差分denylist確認と既存の未コミット変更を巻き込まない確認を行う |
-| resume_condition | #16初版ドラフトは `docs/business-plan-draft.md` に作成済み。R/B/P/JudgeレビューでIntegration Ready。PR未作成 |
-| resume_owner | Orchestrator |
+| next_target | 上位ゴールは完了。#18はBP本文対象外のLoop運用Issueとして、必要時に別途扱う |
+| resume_condition | PR #34はmainへmerge済み。Issue #16はcompleted close済み。Issue #17はPass判定でcompleted close済み。親Issue #1もcompleted close済み |
+| resume_owner | Human / Orchestrator |
 | last_updated | 2026-07-01 |
 | updated_by | Orchestrator |
 
@@ -100,6 +100,10 @@
 | D-050 | PR #33がmainへmergeされ、Issue #14はcompletedとしてcloseされた。Issue #14の状態labelは `status: done` に更新済み | PR #33, GitHub Issue #14 | 2026-07-01 |
 | D-051 | #15 統合前チェックはL1 gateとして実行し、#2〜#14をすべて#16初版統合の対象と判定した。差し戻しIssueはない。ただしHuman CheckはBP-13へ未解消のまま統合する | GitHub Issue #15, `docs/loop-run.log.md` | 2026-07-01 |
 | D-052 | #16 初版ドラフトは、#2〜#14のIntegration Ready素材だけを使ってBP-01〜BP-14へ統合し、R/B/P/JudgeレビューでIntegration Readyと判定した。ただし外部提出、実証実験、商品・価格、安全・衛生・法規制・責任判断はHuman Checkに残す | `docs/business-plan-draft.md`, `docs/loop-run.log.md` | 2026-07-01 |
+| D-053 | #16 初版ドラフトのPR #34を作成し、Issue #16に `integration-ready` と `status: pr-ready` を付与した | PR #34, GitHub Issue #16 | 2026-07-01 |
+| D-054 | PR #34がmainへmergeされ、Issue #16はcompletedとしてcloseされた。Issue #16の状態labelは `status: done` に更新済み | PR #34, GitHub Issue #16 | 2026-07-01 |
+| D-055 | #17 最終レビューはL1 gateとして実行し、`docs/business-plan-draft.md` はG-01〜G-15とBP-01〜BP-14を満たすため、事業計画書初版としてPassと判定した。ただし外部提出、実証実験、商品・価格、安全・衛生・法規制・責任判断はHuman Checkに残す | GitHub Issue #17, `docs/business-plan-draft.md`, `docs/intend.md` | 2026-07-01 |
+| D-056 | 親Issue #1は、#16統合と#17最終レビューPassにより、駄菓子事業計画書初版作成の完了としてcompleted closeした。#18はBP本文対象外のLoop運用Issueであり初版完成のblockerではない | GitHub Issue #1, GitHub Issue #17 | 2026-07-01 |
 
 ## 6. 現在の未完了事項
 
@@ -107,8 +111,9 @@
 |---|---|---|---|---|
 | S-001 | Loop運用資料 | 整備済み | 必要に応じて運用しながら更新する | Orchestrator |
 | S-002 | GitHub Issue品質改善 | 完了 | 更新済みIssueを起点に実行開始可否を判断する | Human / Orchestrator |
-| S-003 | 事業計画Issue実行 | #16 L2レビュー済み / Integration Ready / PR未作成 | 実差分denylist確認と未コミット変更分離確認後、#16 draft PRを作成する | Orchestrator |
-| S-004 | PR handoff | open PRなし | #16初版ドラフトをdraft PR化し、Issue #16へPR Handoffコメントを追加する | Orchestrator |
+| S-003 | 事業計画Issue実行 | 完了。#16 main merge済み / #17 Pass / 親Issue #1 completed | なし。外部共有や実証準備は別Issue候補として扱う | Human / Orchestrator |
+| S-004 | PR handoff | open PRなし | なし | pr_babysitter |
+| S-005 | Loop運用Issue | #18 open / BP本文対象外 | 必要時にLoop運用改善として別途扱う | Human / Orchestrator |
 
 ## 7. Human Queue
 
@@ -173,6 +178,7 @@
 | HQ-058 | BP-13へ残すHuman Checkを解消済みのように見せていないか | GitHub Issue #16/#17, `docs/denylist.json` | #16のVerifierと#17最終レビューで確認する |
 | HQ-059 | 初版ドラフトを外部相談のたたき台として使ってよい範囲をどう置くか | GitHub Issue #16/#17 | Humanが外部共有前の使用範囲を判断する |
 | HQ-060 | #17最終レビューで、`docs/business-plan-draft.md` がG-01〜G-15を満たすか、外部提出版に見えないか、Human Checkを解消済みに見せていないかを判定する | `docs/business-plan-draft.md`, `docs/intend.md`, GitHub Issue #17 | PR #16 merge後に#17をL1レビューとして実行する |
+| HQ-061 | 初版完成後、外部共有、施設相談、保護者説明、法規制・衛生・安全、商品・価格、実証実験へ進む範囲をどう承認するか | `docs/business-plan-draft.md`, GitHub Issue #17 | Humanが次フェーズの範囲と担当を決める |
 
 ## 8. 参照すべき中核資料
 

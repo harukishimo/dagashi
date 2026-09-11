@@ -9,6 +9,8 @@ export async function GET(): Promise<Response> {
     return NextResponse.json({
       products: products.map((product) => ({
         productId: product.productId,
+        status: product.status,
+        stockQuantity: product.stockQuantity == null ? null : Math.max(0, product.stockQuantity),
         name: product.name,
         priceYen: product.priceYen,
         category: product.category,

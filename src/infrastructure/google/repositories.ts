@@ -3,6 +3,27 @@ import { productRowSchema, validateProduct } from "@/domain/validation";
 import type { AuditLog, Product, Setting } from "@/domain/types";
 
 import type { GoogleSheetsClient } from "./sheets-client";
+import { GoogleAdminDataRepository } from "@/application/admin/data";
+
+/** Count each ledger entry once. Pending sales reserve their written items. */
+export async function inventoryConsumption(client: GoogleSheetsClient): Promise<Map<string, number>> {
+  const data = new GoogleAdminDataRepository(client);
+  const [sales, items, rewards] = await Promise.all([data.listSales(), data.listSaleItems(), data.listRewards()]);
+  const liveSales = new Set(sales.filter((sale) => sale.saleStatus !== "voided").map((sale) => sale.saleId));
+  const consumed = new Map<string, number>();
+  const seen = new Set<string>();
+  for (const item of items) {
+    if (!liveSales.has(item.saleId) || seen.has(item.saleItemId)) continue;
+    seen.add(item.saleItemId);
+    consumed.set(item.productId, (consumed.get(item.productId) ?? 0) + item.quantity);
+  }
+  for (const reward of rewards) {
+    if (reward.status !== "completed" || seen.has(reward.redemptionId)) continue;
+    seen.add(reward.redemptionId);
+    consumed.set(reward.productId, (consumed.get(reward.productId) ?? 0) + reward.quantity);
+  }
+  return consumed;
+}
 
 export interface ProductImageRepository {
   inspect(fileId: string): Promise<{
@@ -113,7 +134,19 @@ export class GoogleSheetsProductRepository implements ProductRepository {
     const response = await this.client.getValues("products!A1:K1000");
     const rows = response.values ?? [];
     assertHeader("products", rows[0] ?? []);
-    return rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => rowToProduct(row, index + 2));
+    const products = rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => rowToProduct(row, index + 2));
+    const stockRows = (await this.client.getValues("products!L1:L1000")).values ?? [];
+    if (!stockRows[0]?.[0]) return products;
+    if (text(stockRows[0][0]) !== "stock_total") throw new AppError("SHEETS_UNAVAILABLE");
+    const consumption = await inventoryConsumption(this.client);
+    return products.map((product) => {
+      const rowIndex = rows.findIndex((row) => text(row[0]) === product.productId);
+      const raw = text(stockRows[rowIndex]?.[0]).trim();
+      if (!raw) return { ...product, stockQuantity: null };
+      const total = Number(raw);
+      if (!Number.isSafeInteger(total) || total < 0) throw new AppError("SHEETS_UNAVAILABLE");
+      return { ...product, stockQuantity: total - (consumption.get(product.productId) ?? 0) };
+    });
   }
 
   async findById(productId: string): Promise<Product | null> {
@@ -123,7 +156,14 @@ export class GoogleSheetsProductRepository implements ProductRepository {
 
   async create(product: Product): Promise<Product> {
     validateProduct(product);
-    await this.client.appendValues("products!A:K", [productToRow(product)]);
+    if (product.stockQuantity != null) {
+      const header = (await this.client.getValues("products!L1")).values?.[0]?.[0];
+      if (header && text(header) !== "stock_total") throw new AppError("SHEETS_UNAVAILABLE");
+      await this.client.updateValues("products!L1", [["stock_total"]]);
+      await this.client.appendValues("products!A:L", [[...productToRow(product), String(product.stockQuantity)]]);
+    } else {
+      await this.client.appendValues("products!A:K", [productToRow(product)]);
+    }
     return product;
   }
 
@@ -135,7 +175,19 @@ export class GoogleSheetsProductRepository implements ProductRepository {
     const rowIndex = rows.findIndex((row, index) => index > 0 && text(row[0]) === product.productId);
     if (rowIndex < 1) throw new AppError("NOT_FOUND");
     await this.client.updateValues(`products!A${rowIndex + 1}:K${rowIndex + 1}`, [productToRow(product)]);
+    if (product.stockQuantity !== undefined) await this.saveStock(product);
     return product;
+  }
+
+  private async saveStock(product: Product): Promise<void> {
+    const header = (await this.client.getValues("products!L1")).values?.[0]?.[0];
+    if (header && text(header) !== "stock_total") throw new AppError("SHEETS_UNAVAILABLE");
+    const rows = (await this.client.getValues("products!A1:A1000")).values ?? [];
+    const index = rows.findIndex((row) => text(row[0]) === product.productId);
+    if (index < 1) throw new AppError("NOT_FOUND");
+    const consumed = product.stockQuantity == null ? 0 : (await inventoryConsumption(this.client)).get(product.productId) ?? 0;
+    await this.client.updateValues("products!L1", [["stock_total"]]);
+    await this.client.updateValues(`products!L${index + 1}`, [[product.stockQuantity == null ? "" : String(product.stockQuantity + consumed)]]);
   }
 }
 

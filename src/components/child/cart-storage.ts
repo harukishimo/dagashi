@@ -58,7 +58,8 @@ export function updateCartItem(
   product: ChildProduct,
   requestedQuantity: number,
 ): StoredCart {
-  const quantity = Math.max(0, Math.min(MAX_PRODUCT_QUANTITY, Math.trunc(requestedQuantity)));
+  const limit = product.status === "sold_out" ? 0 : product.stockQuantity ?? MAX_PRODUCT_QUANTITY;
+  const quantity = Math.max(0, Math.min(MAX_PRODUCT_QUANTITY, limit, Math.trunc(requestedQuantity)));
   const current = cart.items.filter((item) => item.productId !== product.productId);
   if (quantity > 0) {
     current.push({ productId: product.productId, quantity, product });

@@ -58,7 +58,7 @@ describe("Google Sheets product repository", () => {
 
   it("reads the schema and converts rows without formula evaluation", async () => {
     const client = {
-      getValues: vi.fn(async () => ({ values: [[...SHEET_HEADERS.products], [product.productId, "=1+1", "30", "チョコ", "🍫", "", "", "10", "active", product.createdAt, product.updatedAt]] })),
+      getValues: vi.fn(async (range: string) => ({ values: range.startsWith("products!L") ? [] : [[...SHEET_HEADERS.products], [product.productId, "=1+1", "30", "チョコ", "🍫", "", "", "10", "active", product.createdAt, product.updatedAt]] })),
     };
     const repository = new GoogleSheetsProductRepository(client as never);
     const rows = await repository.listAll();
@@ -68,6 +68,25 @@ describe("Google Sheets product repository", () => {
   it("rejects missing or reordered headers", async () => {
     const client = { getValues: vi.fn(async () => ({ values: [["product_id"]] })) };
     await expect(new GoogleSheetsProductRepository(client as never).listAll()).rejects.toMatchObject({ code: "SHEETS_UNAVAILABLE" });
+  });
+
+  it("reads stock totals and saves a stocktake as total plus prior consumption", async () => {
+    vi.spyOn(GoogleAdminDataRepository.prototype, "listSales").mockResolvedValue([]);
+    vi.spyOn(GoogleAdminDataRepository.prototype, "listSaleItems").mockResolvedValue([]);
+    vi.spyOn(GoogleAdminDataRepository.prototype, "listRewards").mockResolvedValue([
+      { redemptionId: "r", productId: product.productId, status: "completed", quantity: 3 } as never,
+    ]);
+    const row = [product.productId, product.name, "30", product.category, product.fallbackEmoji, "", "", "10", "active", product.createdAt, product.updatedAt];
+    const client = {
+      getValues: vi.fn(async (range: string) => ({ values: range === "products!L1:L1000" ? [["stock_total"], ["5"]] : range === "products!L1" ? [["stock_total"]] : range === "products!A1:A1000" ? [["product_id"], [product.productId]] : [[...SHEET_HEADERS.products], row] })),
+      updateValues: vi.fn(async () => undefined),
+    };
+    try {
+      const repository = new GoogleSheetsProductRepository(client as never);
+      expect((await repository.listAll())[0].stockQuantity).toBe(2);
+      await repository.update({ ...product, stockQuantity: 8 });
+      expect(client.updateValues).toHaveBeenCalledWith("products!L2", [["11"]]);
+    } finally { vi.restoreAllMocks(); }
   });
 
   it("rejects product rows with extra columns", async () => {

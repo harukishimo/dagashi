@@ -52,6 +52,10 @@ openssl rand -base64 32  # SESSION_SECRET用。32文字以上を設定
 
 出力されたscrypt文字列を`ADMIN_PIN_HASH`へ設定し、サービスアカウントの秘密鍵は改行を`\\n`として1行にするか、利用環境のsecret managerで改行を保持します。秘密鍵、実PIN、`.env.local`はコミットしないでください。
 
+## ブランド画像・リンクプレビュー
+
+アプリアイコンは`public/brand/dagashi-app-icon.png`、SNSやチャットで共有した際の説明画像は`public/brand/dagashi-app-overview.png`です。Next.jsのMetadata APIからOpen Graph・X向け画像として配信します。
+
 ## テスト・品質確認
 
 詳細な実行結果と、sandboxでE2Eを実行できない場合のHuman Checkは [`docs/dagashi-shopping-app-quality-release.md`](docs/dagashi-shopping-app-quality-release.md) を参照してください。

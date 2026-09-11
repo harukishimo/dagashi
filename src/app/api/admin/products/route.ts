@@ -7,6 +7,7 @@ import { toAppError } from "@/lib/errors";
 function productResponse(product: Awaited<ReturnType<ReturnType<typeof createGoogleProductService>["get"]>>) {
   return {
     productId: product.productId,
+    stockQuantity: product.stockQuantity ?? null,
     name: product.name,
     priceYen: product.priceYen,
     category: product.category,

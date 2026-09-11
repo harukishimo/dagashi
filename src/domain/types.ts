@@ -11,6 +11,7 @@ export type PaymentMethod = "cash" | "other";
 export type RewardStatus = "completed" | "voided";
 
 export interface Product {
+  stockQuantity?: number | null;
   productId: string;
   name: string;
   priceYen: number;

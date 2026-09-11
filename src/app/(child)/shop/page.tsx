@@ -23,7 +23,16 @@ export default function ShopPage(): React.JSX.Element {
       setProducts(nextProducts);
       if (nextProducts.length === 0) setState("empty");
       else setState("ready");
-      setCart((current) => current ?? readCart() ?? { requestId: createRequestId(), items: [] });
+      setCart((current) => {
+        const saved = current ?? readCart() ?? { requestId: createRequestId(), items: [] };
+        let next: StoredCart = { ...saved, items: [] };
+        for (const item of saved.items) {
+          const product = nextProducts.find((candidate) => candidate.productId === item.productId);
+          if (product) next = updateCartItem(next, product, item.quantity);
+        }
+        writeCart(next);
+        return next;
+      });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setMessage(error instanceof Error ? error.message : "商品を読み込めませんでした");

@@ -1,8 +1,35 @@
 import { expect, test } from "@playwright/test";
 
+test("sold-out products stay visible and cannot be added", async ({ page }) => {
+  await page.route("**/api/products", (route) => route.fulfill({ json: { products: [
+    { productId: "p", name: "売切チョコ", priceYen: 30, fallbackEmoji: "🍫", status: "active", stockQuantity: 0 },
+  ] } }));
+  await page.goto("/shop");
+  await expect(page.getByText("売り切れ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "売切チョコを1個ふやす" })).toBeDisabled();
+  await expect(page.locator("article")).toHaveCSS("filter", "grayscale(1)");
+});
+
 test("application shell responds", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "じぶんで えらんでみよう！" })).toBeVisible();
+});
+
+test("admin can inspect and change stock", async ({ page }) => {
+  let stock = 2;
+  await page.route("**/api/admin/session", (route) => route.fulfill({ json: { authenticated: true } }));
+  const product = () => ({ productId: "p", name: "在庫チョコ", priceYen: 30, category: "チョコ", fallbackEmoji: "🍫", status: "active", displayOrder: 1, stockQuantity: stock });
+  await page.route("**/api/admin/products", (route) => route.fulfill({ json: { products: [product()] } }));
+  await page.route("**/api/admin/products/p", async (route) => {
+    stock = route.request().postDataJSON().stockQuantity;
+    await route.fulfill({ json: { product: product() } });
+  });
+  await page.goto("/admin/products");
+  await expect(page.getByText("在庫：2個")).toBeVisible();
+  await page.getByRole("button", { name: "編集", exact: true }).click();
+  await page.getByLabel("現在庫（個・空欄は在庫管理なし）").fill("0");
+  await page.getByRole("button", { name: "変更を保存" }).click();
+  await expect(page.getByText("在庫：0個")).toBeVisible();
 });
 
 test("child flow shows product emoji fallback when Drive image is unavailable", async ({ page }) => {

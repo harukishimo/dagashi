@@ -34,6 +34,7 @@ export const productStatusSchema = z.enum(["draft", "active", "sold_out", "hidde
 export const productSchema = z
   .object({
     productId: UUID,
+    stockQuantity: z.number().int().nullable().optional(),
     name: z.string().trim().min(1).max(60),
     priceYen: nonNegativeInt(999_999),
     category: z.string().trim().max(30),
@@ -71,6 +72,7 @@ export const productSchema = z
 
 export const productInputSchema = z
   .object({
+    stockQuantity: nonNegativeInt(999999).nullable().optional(),
     name: z.string().trim().min(1).max(60),
     priceYen: nonNegativeInt(999_999),
     category: z.string().trim().max(30).default(""),

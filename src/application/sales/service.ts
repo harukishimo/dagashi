@@ -45,7 +45,7 @@ export class SaleService {
 
   async create(input: CreateSaleInput): Promise<CreateSaleResult> {
     const parsed = saleInputSchema.parse(input);
-    return this.withKeyLock(`request:${parsed.requestId}`, () => this.createLocked(parsed));
+    return this.withKeyLock("inventory", () => this.createLocked(parsed));
   }
 
   /**
@@ -68,6 +68,14 @@ export class SaleService {
 
     const products = await this.deps.products.listAll();
     const productMap = new Map(products.map((product) => [product.productId, product]));
+    const quantities = new Map<string, number>();
+    for (const item of parsed.items) quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+    for (const [id, quantity] of quantities) {
+      const product = productMap.get(id);
+      if (product?.stockQuantity != null && quantity > product.stockQuantity) {
+        throw new AppError("CONFLICT", { details: ["在庫が不足しています。商品を選び直してください"] });
+      }
+    }
     const saleId = randomUUID();
     const items = parsed.items.map((input) => this.buildItem(saleId, input, productMap));
     const now = this.now().toISOString();

@@ -140,6 +140,9 @@ export class AdminService {
   async redeemReward(productId: string, quantity = 1): Promise<RewardRedemption> {
     if (!Number.isInteger(quantity) || quantity !== 1) throw new AppError("VALIDATION_ERROR", { details: ["特典交換数量は1個にしてください"] });
     const product = await this.deps.products.get(productId);
+    if (product.status !== "active" || (product.stockQuantity != null && product.stockQuantity < quantity)) {
+      throw new AppError("CONFLICT", { details: ["この商品は売り切れ、または在庫不足です"] });
+    }
     const now = this.now().toISOString();
     const reward: RewardRedemption = { redemptionId: randomUUID(), redeemedAt: now, productId: product.productId, productNameSnapshot: product.name, quantity, amountYen: 0, status: "completed", voidedAt: null, voidReason: null, createdAt: now, updatedAt: now };
     await this.deps.data.appendReward(reward);

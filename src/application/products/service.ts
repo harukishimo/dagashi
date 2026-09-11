@@ -11,6 +11,7 @@ import { GoogleSheetsAuditLogRepository, GoogleSheetsProductRepository, GoogleSh
 import { GoogleSheetsClient } from "@/infrastructure/google/sheets-client";
 
 export interface ProductInput {
+  stockQuantity?: number | null;
   name: string;
   priceYen: number;
   category?: string;
@@ -50,7 +51,7 @@ export class ProductService {
       const shopEnabled = await this.deps.settings.find("shop_enabled");
       if (shopEnabled?.value.trim().toLowerCase() === "false") return [];
     }
-    return products.filter((product) => !activeOnly || product.status === "active");
+    return products.filter((product) => !activeOnly || product.status === "active" || product.status === "sold_out");
   }
 
   async get(productId: string): Promise<Product> {
@@ -66,6 +67,7 @@ export class ProductService {
     const visual = imageResolution.visual;
     const product: Product = {
       productId: randomUUID(),
+      stockQuantity: parsed.stockQuantity ?? null,
       name: parsed.name,
       priceYen: parsed.priceYen,
       category: parsed.category,
@@ -94,6 +96,7 @@ export class ProductService {
     const visual = imageResolution.visual;
     const product: Product = {
       ...current,
+      stockQuantity: parsed.stockQuantity === undefined ? current.stockQuantity : parsed.stockQuantity,
       name: parsed.name,
       priceYen: parsed.priceYen,
       category: parsed.category,
@@ -105,7 +108,7 @@ export class ProductService {
       updatedAt: this.now().toISOString(),
     };
     validateProduct(product);
-    await this.deps.products.update(product);
+    await this.deps.products.update({ ...product, stockQuantity: parsed.stockQuantity });
     await this.deps.audit.append(toAudit({ action: "product.update", targetType: "product", targetId: product.productId, summary: `商品を更新: ${product.name}` }, this.now()));
     return { product, imageWarning: imageResolution.warning };
   }

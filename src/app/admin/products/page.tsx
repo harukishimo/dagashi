@@ -13,6 +13,7 @@ type AdminProduct = Omit<Product, "imageFileId"> & {
 };
 
 interface ProductForm {
+  stockQuantity: string;
   name: string;
   priceYen: string;
   category: string;
@@ -23,13 +24,14 @@ interface ProductForm {
   removeImage: boolean;
 }
 
-const EMPTY_FORM: ProductForm = { name: "", priceYen: "", category: "", fallbackEmoji: "", imageSource: "", displayOrder: "0", status: "draft", removeImage: false };
+const EMPTY_FORM: ProductForm = { stockQuantity: "0", name: "", priceYen: "", category: "", fallbackEmoji: "", imageSource: "", displayOrder: "0", status: "draft", removeImage: false };
 
 const STATUS_LABEL: Record<Product["status"], string> = { draft: "下書き", active: "販売中", sold_out: "売切", hidden: "非表示" };
 
 function formFromProduct(product: AdminProduct): ProductForm {
   return {
     name: product.name,
+    stockQuantity: product.stockQuantity == null ? "" : String(Math.max(0, product.stockQuantity)),
     priceYen: String(product.priceYen),
     category: product.category,
     fallbackEmoji: product.fallbackEmoji,
@@ -96,6 +98,9 @@ export default function AdminProductsPage() {
         displayOrder: Number(form.displayOrder),
         status: form.status,
       };
+      if (!editingProduct || form.stockQuantity !== formFromProduct(editingProduct).stockQuantity) {
+        input.stockQuantity = form.stockQuantity === "" ? null : Number(form.stockQuantity);
+      }
       if (editingProduct) {
         // An empty source on edit preserves the existing Drive image. Explicitly checking
         // removeImage is the only way to clear it, preventing accidental image loss.
@@ -128,12 +133,14 @@ export default function AdminProductsPage() {
   }
 
   return <>
-    <header className={styles.header}><h1>商品マスタ</h1></header>
+    <header className={styles.header}><h1>商品マスタ・在庫管理</h1><button className={styles.button} onClick={() => load().catch(() => setError("在庫を更新できませんでした"))}>最新の在庫を確認</button></header>
     {error && <p className={styles.error} role="alert">{error}</p>}
     {message && <p className={styles.notice} role="status">{message}</p>}
     <section className={styles.panel}>
       <h2>{editingProduct ? `商品を編集：${editingProduct.name}` : "商品を追加"}</h2>
       <form className={styles.form} onSubmit={submit}>
+        <label className={styles.label}>現在庫（個・空欄は在庫管理なし）<input className={styles.input} type="number" min="0" max="999999" step="1" value={form.stockQuantity} onChange={(event) => setForm({ ...form, stockQuantity: event.target.value })} /></label>
+        <p>入荷・棚卸し時は、いま実際にある個数を入力してください。売上と特典交換で自動的に減り、売上取消で戻ります。会計中の変更は避けてください。</p>
         <label className={styles.label}>商品名<input className={styles.input} required maxLength={60} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
         <label className={styles.label}>価格（円）<input className={styles.input} required type="number" min="0" max="999999" value={form.priceYen} onChange={(event) => setForm({ ...form, priceYen: event.target.value })} /></label>
         <label className={styles.label}>カテゴリ<input className={styles.input} maxLength={30} value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} /></label>
@@ -149,7 +156,7 @@ export default function AdminProductsPage() {
       </form>
     </section>
     <section className={styles.panel} style={{ marginTop: 24 }}>
-      <h2>登録済み商品</h2>
+      <h2>登録済み商品・在庫一覧</h2>
       <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>商品</th><th>画像</th><th>価格</th><th>状態</th><th>操作</th></tr></thead><tbody>
         {products.map((product) => {
           const showImage = product.imageUrl && !failedImages.has(product.productId);
@@ -157,7 +164,7 @@ export default function AdminProductsPage() {
             <td><div className={styles.productCell}><span className={styles.productThumb}>{showImage ? <Image src={product.imageUrl ?? ""} width={42} height={42} sizes="42px" unoptimized alt="" onError={() => imageFailed(product.productId)} /> : product.fallbackEmoji || "🍬"}</span><span>{product.name}</span></div></td>
             <td>{showImage ? "Drive画像" : product.imageConfigured ? <span title="画像を読み込めないため絵文字で表示中">絵文字（要確認）</span> : "絵文字"}</td>
             <td>{product.priceYen.toLocaleString()}円</td>
-            <td>{STATUS_LABEL[product.status]}</td>
+            <td>{STATUS_LABEL[product.status]}<br />在庫：{product.stockQuantity == null ? "未設定" : `${product.stockQuantity}個`}{product.stockQuantity != null && product.stockQuantity <= 0 && <strong>（売り切れ）</strong>}</td>
             <td><div className={styles.actionRow}><button className={`${styles.button} ${styles.buttonSecondary}`} type="button" onClick={() => startEdit(product)}>編集</button><button className={`${styles.button} ${styles.buttonSecondary}`} type="button" onClick={() => duplicate(product)}>複製</button></div></td>
           </tr>;
         })}

@@ -2,6 +2,7 @@ export type ProductStatus = "draft" | "active" | "sold_out" | "hidden";
 
 /** The small, client-safe product contract returned by GET /api/products. */
 export interface ChildProduct {
+  stockQuantity?: number | null;
   productId: string;
   name: string;
   priceYen: number;

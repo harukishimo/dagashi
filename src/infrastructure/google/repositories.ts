@@ -230,7 +230,23 @@ export class GoogleSheetsSchemaRepository {
       assertHeader(sheet, response.values?.[0] ?? []);
     }
     const settings = new GoogleSheetsSettingsRepository(this.client);
-    const version = await settings.find("schema_version");
+    const entries = await settings.list();
+    const version = entries.find((entry) => entry.key === "schema_version");
     if (!version || version.value !== "2") throw new AppError("SHEETS_UNAVAILABLE", { details: ["settings.schema_version must be 2"] });
+    const toggles = entries.filter((entry) => entry.key === "challenge_enabled");
+    if (toggles.length !== 1 || !["true", "false"].includes(toggles[0].value)) {
+      throw new AppError("SHEETS_UNAVAILABLE", { details: ["settings.challenge_enabled migration required"] });
+    }
+    const extensions = [
+      ["sales!P1:Q1", ["event_id", "event_name_snapshot"]],
+      ["events!A1:F1", ["event_id", "name", "start_date", "end_date", "created_at", "status"]],
+    ] as const;
+    for (const [range, headers] of extensions) {
+      const response = await this.client.getValues(range);
+      const row = response.values?.[0] ?? [];
+      if (row.length !== headers.length || headers.some((header, index) => row[index] !== header)) {
+        throw new AppError("SHEETS_UNAVAILABLE", { details: ["event schema migration required"] });
+      }
+    }
   }
 }

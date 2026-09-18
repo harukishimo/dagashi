@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ChildHeader } from "@/components/child/ChildHeader";
-import { cartItemsFromStored, cartTotal, readCart } from "@/components/child/cart-storage";
+import { cartItemsFromStored, cartTotal, clearCart, readCart } from "@/components/child/cart-storage";
 import { AsyncButton } from "@/components/common/AsyncButton";
 import { InlineError } from "@/components/common/InlineError";
 import styles from "@/components/child/child-ui.module.css";
 
 export default function CheckoutPage(): React.JSX.Element {
+  const router = useRouter();
   const cart = useMemo(() => readCart(), []);
   const items = useMemo(() => cartItemsFromStored(cart), [cart]);
   const total = cartTotal(items);
@@ -18,13 +20,22 @@ export default function CheckoutPage(): React.JSX.Element {
   const [authRequired, setAuthRequired] = useState(false);
   const [pin, setPin] = useState("");
 
+  const continueAfterSale = (sale: { saleId: string; experienceStatus?: string }) => {
+    if (sale.experienceStatus === "skipped") {
+      clearCart();
+      router.replace("/");
+    } else {
+      window.location.assign(`/challenge/${encodeURIComponent(sale.saleId)}`);
+    }
+  };
+
   const lookupExistingSale = async (): Promise<boolean> => {
     if (!cart) return false;
     try {
       const response = await fetch(`/api/sales/by-request/${encodeURIComponent(cart.requestId)}`, { headers: { Origin: window.location.origin }, cache: "no-store" });
-      const body = (await response.json()) as { data?: { saleId?: string; writeStatus?: string } | null };
+      const body = (await response.json()) as { data?: { saleId?: string; writeStatus?: string; experienceStatus?: string } | null };
       if (response.ok && body.data?.saleId && body.data.writeStatus === "completed") {
-        window.location.assign(`/challenge/${encodeURIComponent(body.data.saleId)}`);
+        continueAfterSale({ ...body.data, saleId: body.data.saleId });
         return true;
       }
     } catch {
@@ -39,14 +50,14 @@ export default function CheckoutPage(): React.JSX.Element {
     setError("");
     try {
       const response = await fetch("/api/sales", { method: "POST", headers: { "content-type": "application/json", Origin: window.location.origin }, body: JSON.stringify({ requestId: cart.requestId, paymentMethod, items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })) }) });
-      const body = (await response.json()) as { data?: { saleId?: string }; error?: { message?: string } };
+      const body = (await response.json()) as { data?: { saleId?: string; writeStatus?: string; experienceStatus?: string }; error?: { message?: string } };
       if (response.status === 401) {
         setAuthRequired(true);
         setPending(false);
         return;
       }
-      if (!response.ok || !body.data?.saleId) throw new Error(body.error?.message ?? "売上を保存できませんでした");
-      window.location.assign(`/challenge/${encodeURIComponent(body.data.saleId)}`);
+      if (!response.ok || !body.data?.saleId || body.data.writeStatus !== "completed") throw new Error(body.error?.message ?? "売上を保存できませんでした");
+      continueAfterSale({ ...body.data, saleId: body.data.saleId });
     } catch (cause) {
       if (await lookupExistingSale()) return;
       setError(cause instanceof Error ? cause.message : "売上を保存できませんでした。お店の人に画面を見せてね。");

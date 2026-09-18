@@ -11,6 +11,8 @@ import { GoogleSheetsClient } from "@/infrastructure/google/sheets-client";
 import { GoogleAccessTokenProvider } from "@/infrastructure/google/auth";
 import { GoogleSheetsSaleRepository } from "@/infrastructure/google/sales-repositories";
 import { getServerEnv } from "@/config/env";
+import { eventForSale } from "@/domain/events";
+import { GoogleEventRepository, type EventRepository } from "@/infrastructure/google/event-repository";
 
 export interface CreateSaleInput {
   requestId: string;
@@ -28,6 +30,7 @@ export interface SaleServiceDependencies {
   products: ProductRepository;
   sales: SaleRepository;
   settings?: SettingsRepository;
+  events?: EventRepository;
   now?: () => Date;
 }
 
@@ -79,10 +82,14 @@ export class SaleService {
     const saleId = randomUUID();
     const items = parsed.items.map((input) => this.buildItem(saleId, input, productMap));
     const now = this.now().toISOString();
+    const [events, challengeSetting] = await Promise.all([this.deps.events?.list() ?? [], this.deps.settings?.find("challenge_enabled")]);
+    const event = eventForSale(events, now);
+    const challengeEnabled = challengeSetting?.value.trim().toLowerCase() !== "false";
     const sale: Sale = {
       saleId, requestId: parsed.requestId, soldAt: now,
       writeStatus: "pending", saleStatus: "completed", totalYen: calculateSaleTotal(items), paymentMethod: parsed.paymentMethod,
-      experienceStatus: "challenge_pending", elapsedMs: null, challengeSuccess: null, stampCount: null,
+      experienceStatus: challengeEnabled ? "challenge_pending" : "skipped", elapsedMs: null, challengeSuccess: challengeEnabled ? null : false, stampCount: challengeEnabled ? null : 1,
+      eventId: event?.eventId ?? null, eventNameSnapshot: event?.name ?? null,
       voidedAt: null, voidReason: null, createdAt: now, updatedAt: now,
     };
     await this.deps.sales.appendPending(sale);
@@ -192,5 +199,6 @@ export function createGoogleSaleService(): SaleService {
     products: new GoogleSheetsProductRepository(sheets),
     sales: new GoogleSheetsSaleRepository(sheets),
     settings: new GoogleSheetsSettingsRepository(sheets),
+    events: new GoogleEventRepository(sheets),
   });
 }

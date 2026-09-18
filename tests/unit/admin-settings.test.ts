@@ -14,6 +14,8 @@ describe("admin settings allowlist", () => {
   it("validates numeric and boolean values", () => {
     expect(validateAdminSettingValue("challenge_success_min_ms", "9500")).toBe("9500");
     expect(validateAdminSettingValue("shop_enabled", false)).toBe("false");
+    expect(validateAdminSettingValue("challenge_enabled", false)).toBe("false");
+    expect(() => validateAdminSettingValue("challenge_enabled", "off")).toThrow();
     expect(() => validateAdminSettingValue("challenge_success_min_ms", "-1")).toThrow();
     expect(() => validateAdminSettingValue("shop_enabled", "yes")).toThrow();
     expect(() => validateAdminSettingValue("schema_version", "3")).toThrow();

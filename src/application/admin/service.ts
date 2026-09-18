@@ -116,12 +116,12 @@ export class AdminService {
     return { startDate, endDate, rows };
   }
 
-  async sales(options: { saleId?: string | null; startDate?: string | null; endDate?: string | null } = {}): Promise<{ sales: Array<Sale & { items: SaleItem[] }> }> {
+  async sales(options: { saleId?: string | null; startDate?: string | null; endDate?: string | null; eventId?: string | null } = {}): Promise<{ sales: Array<Sale & { items: SaleItem[] }> }> {
     const [sales, items] = await Promise.all([this.deps.data.listSales(), this.deps.data.listSaleItems()]);
     const startDate = options.startDate ? validateDate(options.startDate, options.startDate) : null;
     const endDate = options.endDate ? validateDate(options.endDate, options.endDate) : null;
     const result = sales.filter((sale) => (!options.saleId || sale.saleId === options.saleId) && (!startDate || dateKey(sale.soldAt, this.timeZone) >= startDate) && (!endDate || dateKey(sale.soldAt, this.timeZone) <= endDate)).sort((a, b) => b.soldAt.localeCompare(a.soldAt)).map((sale) => ({ ...sale, items: items.filter((item) => item.saleId === sale.saleId) }));
-    return { sales: result };
+    return { sales: result.filter((sale) => !options.eventId || (options.eventId === "none" ? !sale.eventId : sale.eventId === options.eventId)) };
   }
 
   async voidSale(saleId: string, reason: string): Promise<Sale> {

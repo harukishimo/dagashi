@@ -54,9 +54,10 @@ function integerRange(value: unknown, min: number, max: number, label: string, r
   return number;
 }
 
-function toSale(row: unknown[], rowNumber: number): Sale {
+export function toSale(row: unknown[], rowNumber: number): Sale {
   const expected = SHEET_HEADERS.sales;
-  if (row.length !== expected.length) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} is invalid`] });
+  if (row.length < expected.length || row.length > expected.length + 2) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} is invalid`] });
+  if (Boolean(nullableText(row[15])) !== Boolean(nullableText(row[16]))) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} event snapshot is incomplete`] });
   const elapsedText = nullableText(row[8]);
   const elapsedMs = elapsedText === null ? null : integerRange(elapsedText, 0, 60_000, "sales.elapsed_ms", rowNumber);
   const stampText = nullableText(row[10]);
@@ -70,6 +71,8 @@ function toSale(row: unknown[], rowNumber: number): Sale {
     experienceStatus: enumValue(row[7], ["challenge_pending", "challenge_started", "completed", "skipped", "interrupted"], "sales.experience_status", rowNumber), elapsedMs,
     challengeSuccess: parseBoolean(row[9], rowNumber), stampCount,
     voidedAt: nullableText(row[11]), voidReason: nullableText(row[12]), createdAt: text(row[13]), updatedAt: text(row[14]),
+    eventId: nullableText(row[15]) ? uuidValue(row[15], "sales.event_id", rowNumber) : null,
+    eventNameSnapshot: nullableText(row[16]),
   };
   return sale;
 }
@@ -87,8 +90,15 @@ function toSaleItem(row: unknown[], rowNumber: number): SaleItem {
   return item;
 }
 
-function saleRow(sale: Sale): string[] {
-  return [sale.saleId, sale.requestId, sale.soldAt, sale.writeStatus, sale.saleStatus, String(sale.totalYen), sale.paymentMethod, sale.experienceStatus, sale.elapsedMs === null ? "" : String(sale.elapsedMs), sale.challengeSuccess === null ? "" : String(sale.challengeSuccess).toUpperCase(), sale.stampCount === null ? "" : String(sale.stampCount), sale.voidedAt ?? "", sale.voidReason ?? "", sale.createdAt, sale.updatedAt];
+export function saleRow(sale: Sale): string[] {
+  return [sale.saleId, sale.requestId, sale.soldAt, sale.writeStatus, sale.saleStatus, String(sale.totalYen), sale.paymentMethod, sale.experienceStatus, sale.elapsedMs === null ? "" : String(sale.elapsedMs), sale.challengeSuccess === null ? "" : String(sale.challengeSuccess).toUpperCase(), sale.stampCount === null ? "" : String(sale.stampCount), sale.voidedAt ?? "", sale.voidReason ?? "", sale.createdAt, sale.updatedAt, sale.eventId ?? "", sale.eventNameSnapshot ?? ""];
+}
+
+export function assertSalesHeader(row: unknown[], requireEvents = false): void {
+  const headers = SHEET_HEADERS.sales;
+  const baseValid = headers.every((header, index) => row[index] === header);
+  const extended = row.length === 17 && row[15] === "event_id" && row[16] === "event_name_snapshot";
+  if (!baseValid || (!extended && (requireEvents || row.length !== 15))) throw new AppError("SHEETS_UNAVAILABLE", { details: ["sales header mismatch: イベント列の移行を確認してください"] });
 }
 
 function itemRow(item: SaleItem): string[] {
@@ -107,7 +117,9 @@ export class GoogleSheetsSaleRepository implements SaleRepository {
   }
 
   async appendPending(sale: Sale): Promise<void> {
-    await this.client.appendValues("sales!A:O", [saleRow(sale)], { uncertainWrite: true });
+    const response = await this.client.getValues("sales!A1:Q1");
+    assertSalesHeader(response.values?.[0] ?? [], true);
+    await this.client.appendValues("sales!A:Q", [saleRow(sale)], { uncertainWrite: true });
   }
 
   async appendItems(items: SaleItem[]): Promise<void> {
@@ -123,20 +135,19 @@ export class GoogleSheetsSaleRepository implements SaleRepository {
   }
 
   async update(sale: Sale): Promise<void> {
-    const response = await this.client.getValues("sales!A1:O10000");
+    const response = await this.client.getValues("sales!A1:Q10000");
     const rows = response.values ?? [];
-    const headers = SHEET_HEADERS.sales;
-    if (rows[0]?.length !== headers.length || headers.some((header, index) => text(rows[0]?.[index]) !== header)) throw new AppError("SHEETS_UNAVAILABLE", { details: ["sales header mismatch"] });
+    assertSalesHeader(rows[0] ?? []);
     const index = rows.findIndex((row, rowIndex) => rowIndex > 0 && text(row[0]) === sale.saleId);
     if (index < 1) throw new AppError("NOT_FOUND");
-    await this.client.updateValues(`sales!A${index + 1}:O${index + 1}`, [saleRow(sale)]);
+    const extended = rows[0].length === 17;
+    await this.client.updateValues(`sales!A${index + 1}:${extended ? "Q" : "O"}${index + 1}`, [saleRow(sale).slice(0, extended ? 17 : 15)]);
   }
 
   private async listSales(): Promise<Sale[]> {
-    const response = await this.client.getValues("sales!A1:O10000");
+    const response = await this.client.getValues("sales!A1:Q10000");
     const rows = response.values ?? [];
-    const headers = SHEET_HEADERS.sales;
-    if (rows[0]?.length !== headers.length || headers.some((header, index) => text(rows[0]?.[index]) !== header)) throw new AppError("SHEETS_UNAVAILABLE", { details: ["sales header mismatch"] });
+    assertSalesHeader(rows[0] ?? []);
     return rows.slice(1).filter((row) => text(row[0]).trim() !== "").map((row, index) => toSale(row, index + 2));
   }
 }

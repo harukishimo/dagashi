@@ -35,6 +35,18 @@ class MemorySettings implements SettingsRepository {
 const fixedNow = () => new Date("2026-01-01T00:00:00.000Z");
 
 describe("SaleService", () => {
+  it("snapshots matching event and challenge off once, including replay", async () => {
+    const sales = new MemorySales();
+    let enabled = "false";
+    const event = { eventId: "99999999-9999-4999-8999-999999999999", name: "新年", startDate: "2026-01-01", endDate: "2026-01-01", createdAt: fixedNow().toISOString() };
+    const service = new SaleService({ products: new MemoryProducts(), sales, now: fixedNow, events: { list: async () => [event], append: async () => undefined }, settings: { list: async () => [], find: async (key) => key === "challenge_enabled" ? { key, value: enabled, updatedAt: fixedNow().toISOString() } : null } });
+    const input = { requestId: "88888888-8888-4888-8888-888888888888", paymentMethod: "cash" as const, items: [{ productId: product.productId, quantity: 1 }] };
+    const result = await service.create(input);
+    expect(result.sale).toMatchObject({ eventId: event.eventId, eventNameSnapshot: "新年", experienceStatus: "skipped", stampCount: 1, challengeSuccess: false });
+    enabled = "true";
+    expect((await service.create(input)).sale).toMatchObject({ experienceStatus: "skipped", stampCount: 1 });
+    await expect(service.challenge(result.sale.saleId, { action: "start" })).rejects.toMatchObject({ code: "CONFLICT" });
+  });
   it("stores one completed sale and replays the same request id", async () => {
     const sales = new MemorySales();
     const service = new SaleService({ products: new MemoryProducts(), sales, now: fixedNow });

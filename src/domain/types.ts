@@ -26,6 +26,8 @@ export interface Product {
 }
 
 export interface Sale {
+  eventId?: string | null;
+  eventNameSnapshot?: string | null;
   saleId: string;
   requestId: string;
   soldAt: string;
@@ -41,6 +43,15 @@ export interface Sale {
   voidReason: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SalesEvent {
+  status?: "active" | "archived";
+  eventId: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
 }
 
 export interface SaleItem {

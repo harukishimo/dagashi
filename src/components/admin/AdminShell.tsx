@@ -9,6 +9,7 @@ import styles from "./admin.module.css";
 
 const navItems = [
   ["/admin", "ダッシュボード"],
+  ["/admin/events", "イベント・売上"],
   ["/admin/sales/products", "商品別売上"],
   ["/admin/sales", "取引履歴"],
   ["/admin/products", "商品マスタ"],

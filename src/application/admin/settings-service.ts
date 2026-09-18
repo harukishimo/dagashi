@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import type { Setting } from "@/domain/types";
 import { AppError } from "@/lib/errors";
-import { SHEET_HEADERS } from "@/infrastructure/google/repositories";
+import { GoogleSheetsAuditLogRepository, SHEET_HEADERS } from "@/infrastructure/google/repositories";
 import type { GoogleSheetsClient } from "@/infrastructure/google/sheets-client";
 
 /** Settings that the admin UI is allowed to read or change. Secrets never belong here. */
@@ -9,6 +10,7 @@ export const ADMIN_SETTING_KEYS = [
   "challenge_success_max_ms",
   "challenge_timeout_ms",
   "shop_enabled",
+  "challenge_enabled",
 ] as const;
 
 export type AdminSettingKey = (typeof ADMIN_SETTING_KEYS)[number];
@@ -40,8 +42,8 @@ export function validateAdminSettingValue(key: string, value: unknown): string {
     throw validation(`${key} の値が不正です`);
   }
   const normalized = String(value).trim();
-  if (key === "shop_enabled") {
-    if (normalized !== "true" && normalized !== "false") throw validation("shop_enabled は true または false です");
+  if (key === "shop_enabled" || key === "challenge_enabled") {
+    if (normalized !== "true" && normalized !== "false") throw validation(`${key} は true または false です`);
     return normalized;
   }
 
@@ -71,9 +73,7 @@ export interface AdminSettingsState {
 
 /** Small sheet adapter used only by the protected admin settings endpoint. */
 export class AdminSettingsService {
-  constructor(private readonly client: GoogleSheetsClient, now?: () => Date) {
-    void now;
-  }
+  constructor(private readonly client: GoogleSheetsClient, private readonly now: () => Date = () => new Date()) {}
 
   async read(): Promise<AdminSettingsState> {
     const response = await this.client.getValues("settings!A1:C100");
@@ -83,19 +83,31 @@ export class AdminSettingsService {
       .filter((row) => text(row[0]).trim() !== "")
       .map((row) => ({ key: text(row[0]), value: text(row[1]), updatedAt: text(row[2]) }));
     return {
-      settings: filterAdminSettings(settings),
+      settings: { challenge_enabled: "true", ...filterAdminSettings(settings) },
       schemaVersion: settings.find((setting) => setting.key === "schema_version")?.value ?? null,
       rows,
     };
   }
 
-  /**
-   * Runtime setting changes are intentionally disabled for the MVP. The
-   * challenge code uses fixed domain constants, so accepting writes here
-   * would make the admin UI suggest a feature that has no effect.
-   */
-  async update(updates: Record<string, unknown>): Promise<never> {
-    void updates;
-    throw new AppError("CONFLICT", { details: ["MVPでは設定値をSpreadsheetで管理します"] });
+  /** Only the experience toggle is writable; timing remains fixed in domain code. */
+  async update(updates: Record<string, unknown>): Promise<AdminSettings> {
+    if (!updates || typeof updates !== "object" || Array.isArray(updates) || Object.keys(updates).length !== 1 || !("challenge_enabled" in updates)) {
+      throw new AppError("CONFLICT", { details: ["変更できるのは challenge_enabled のみです"] });
+    }
+    const value = validateAdminSettingValue("challenge_enabled", updates.challenge_enabled);
+    const state = await this.read();
+    const matches = state.rows.map((row, index) => row[0] === "challenge_enabled" ? index : -1).filter((index) => index >= 0);
+    if (matches.length > 1) throw new AppError("SHEETS_UNAVAILABLE", { details: ["challenge_enabled duplicate rows"] });
+    const timestamp = this.now().toISOString();
+    const row = ["challenge_enabled", value, timestamp];
+    if (matches.length) {
+      await this.client.updateValues(`settings!A${matches[0] + 1}:C${matches[0] + 1}`, [row]);
+    } else {
+      // Sheets cannot atomically insert-if-absent across server instances.
+      // Provision the unique row once instead of racing duplicate appends.
+      throw new AppError("CONFLICT", { message: "settingsシートに challenge_enabled の行を1つ作成し、値を true に設定してください" });
+    }
+    await new GoogleSheetsAuditLogRepository(this.client).append({ logId: randomUUID(), occurredAt: timestamp, action: "setting.update", targetType: "setting", targetId: "challenge_enabled", summary: `challenge_enabled=${value}` });
+    return { ...state.settings, challenge_enabled: value };
   }
 }

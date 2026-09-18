@@ -36,6 +36,13 @@ export async function GET(request: Request): Promise<Response> {
 
 export async function PATCH(request: Request): Promise<Response> {
   if (!(await requireAdminSession(request, { requireOrigin: true }))) return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "認証が必要です" } }, { status: 401 });
-  const error = new AppError("CONFLICT", { details: ["MVPでは設定値をSpreadsheetで管理します"] });
-  return refreshAdminSessionCookie(request, NextResponse.json(error.toResponse(), { status: error.status }));
+  try {
+    let body: unknown;
+    try { body = await request.json(); } catch { throw new AppError("VALIDATION_ERROR"); }
+    const settings = await createSettingsService().update(body as Record<string, unknown>);
+    return refreshAdminSessionCookie(request, NextResponse.json({ data: { settings } }));
+  } catch (error) {
+    const appError = toAppError(error);
+    return NextResponse.json(appError.toResponse(), { status: appError.status });
+  }
 }

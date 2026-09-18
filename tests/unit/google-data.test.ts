@@ -99,7 +99,7 @@ describe("Google Sheets product repository", () => {
     await expect(new GoogleSheetsSettingsRepository(client as never).list()).rejects.toMatchObject({ code: "SHEETS_UNAVAILABLE" });
   });
 
-  it("validates all six tabs and schema_version=2", async () => {
+  it("validates base tabs, event extensions and challenge setting", async () => {
     const valuesByRange: Record<string, string[][]> = {
       "products!A1:K1": [[...SHEET_HEADERS.products]],
       "sales!A1:O1": [[...SHEET_HEADERS.sales]],
@@ -107,10 +107,14 @@ describe("Google Sheets product repository", () => {
       "reward_redemptions!A1:K1": [[...SHEET_HEADERS.reward_redemptions]],
       "settings!A1:C1": [[...SHEET_HEADERS.settings]],
       "audit_logs!A1:F1": [[...SHEET_HEADERS.audit_logs]],
-      "settings!A1:C100": [[...SHEET_HEADERS.settings], ["schema_version", "2", "2026-07-23T00:00:00.000Z"]],
+      "settings!A1:C100": [[...SHEET_HEADERS.settings], ["schema_version", "2", "2026-07-23T00:00:00.000Z"], ["challenge_enabled", "true", "2026-09-18T00:00:00.000Z"]],
+      "sales!P1:Q1": [["event_id", "event_name_snapshot"]],
+      "events!A1:F1": [["event_id", "name", "start_date", "end_date", "created_at", "status"]],
     };
     const client = { getValues: vi.fn(async (range: string) => ({ values: valuesByRange[range] ?? [] })) };
     await expect(new GoogleSheetsSchemaRepository(client as never).validateSchema()).resolves.toBeUndefined();
+    valuesByRange["events!A1:F1"] = [];
+    await expect(new GoogleSheetsSchemaRepository(client as never).validateSchema()).rejects.toMatchObject({ code: "SHEETS_UNAVAILABLE" });
   });
 });
 

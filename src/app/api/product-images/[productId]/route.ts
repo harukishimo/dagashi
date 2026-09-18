@@ -20,7 +20,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
     const tokenProvider = credentials ? new GoogleAccessTokenProvider(credentials) : undefined;
     const sheets = new GoogleSheetsClient({ spreadsheetId: env.GOOGLE_SPREADSHEET_ID, tokenProvider });
     const products = new GoogleSheetsProductRepository(sheets);
-    const product = await products.findById(productId);
+    const product = await products.findImageProductById(productId);
     if (!product || product.status !== "active" || !product.imageFileId) {
       return new Response(null, { status: 404 });
     }

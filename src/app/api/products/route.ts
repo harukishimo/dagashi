@@ -22,6 +22,9 @@ export async function GET(): Promise<Response> {
     });
   } catch (error) {
     const appError = toAppError(error);
-    return NextResponse.json(appError.toResponse(), { status: appError.status });
+    return NextResponse.json(appError.toResponse(), { status: appError.status, headers: {
+      "cache-control": "no-store",
+      ...(appError.status === 429 ? { "retry-after": "60" } : {}),
+    } });
   }
 }

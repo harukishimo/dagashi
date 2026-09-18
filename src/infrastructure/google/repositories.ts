@@ -130,6 +130,14 @@ function assertHeader(sheet: SheetName, values: unknown[]): void {
 export class GoogleSheetsProductRepository implements ProductRepository {
   constructor(private readonly client: GoogleSheetsClient) {}
 
+  /** Image lookup must not read stock totals or any sales ledger. */
+  async findImageProductById(productId: string): Promise<Product | null> {
+    const rows = (await this.client.getImageCatalog()).values ?? [];
+    assertHeader("products", rows[0] ?? []);
+    const index = rows.findIndex((row, i) => i > 0 && text(row[0]) === productId);
+    return index < 1 ? null : rowToProduct(rows[index], index + 1);
+  }
+
   async listAll(): Promise<Product[]> {
     const response = await this.client.getValues("products!A1:K1000");
     const rows = response.values ?? [];

@@ -5,6 +5,9 @@ import type { GoogleAccessTokenProvider, GoogleFetch } from "./auth";
 const SHEETS_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
 const MAX_ATTEMPTS = 3;
 
+// Image metadata only. Never use this cache for stock or checkout reads.
+const imageCatalogCache = new Map<string, { expiresAt: number; value: Promise<SheetsValueResponse> }>();
+
 export interface SheetsValueResponse {
   range?: string;
   majorDimension?: "ROWS" | "COLUMNS";
@@ -47,6 +50,26 @@ export class GoogleSheetsClient {
 
   async getValues(range: string): Promise<SheetsValueResponse> {
     return this.request<SheetsValueResponse>(`/${encodeURIComponent(this.options.spreadsheetId)}/values/${encodeURIComponent(range)}`);
+  }
+
+  async getImageCatalog(): Promise<SheetsValueResponse> {
+    if (!this.options.tokenProvider) throw new AppError("SHEETS_UNAVAILABLE", { status: 503 });
+    const key = this.options.spreadsheetId;
+    const now = Date.now();
+    const cached = imageCatalogCache.get(key);
+    if (cached && cached.expiresAt > now) return structuredClone(await cached.value);
+    for (const [id, entry] of imageCatalogCache) {
+      if (entry.expiresAt <= now) imageCatalogCache.delete(id);
+    }
+    if (imageCatalogCache.size >= 64) imageCatalogCache.delete(imageCatalogCache.keys().next().value!);
+    const entry = { expiresAt: now + 30_000, value: this.getValues("products!A1:K1000") };
+    imageCatalogCache.set(key, entry);
+    try {
+      return structuredClone(await entry.value);
+    } catch (error) {
+      if (imageCatalogCache.get(key) === entry) imageCatalogCache.delete(key);
+      throw error;
+    }
   }
 
   async appendValues(range: string, values: string[][], options: { uncertainWrite?: boolean } = {}): Promise<void> {
@@ -103,7 +126,7 @@ export class GoogleSheetsClient {
         if (!classified.retryable) throw classified;
         if (attempt === maxAttempts) throw classified;
       }
-      await this.sleep(2 ** (attempt - 1) * 100);
+      await this.sleep(2 ** (attempt - 1) * 1000 + Math.floor(Math.random() * 1000));
     }
     throw lastError instanceof Error ? lastError : new AppError("SHEETS_UNAVAILABLE", { retryable: true });
   }

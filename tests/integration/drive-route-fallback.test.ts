@@ -37,7 +37,7 @@ describe("Drive route outage boundaries", () => {
     mockCommonModules();
     vi.doMock("@/infrastructure/google/repositories", () => ({
       GoogleSheetsProductRepository: class {
-        async findById() { return product; }
+        async findImageProductById() { return product; }
       },
     }));
     vi.doMock("@/infrastructure/google/drive-client", async () => {

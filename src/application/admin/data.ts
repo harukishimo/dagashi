@@ -8,6 +8,7 @@ import {
 } from "@/infrastructure/google/repositories";
 import type { GoogleSheetsClient } from "@/infrastructure/google/sheets-client";
 import { assertSalesHeader } from "@/infrastructure/google/sales-repositories";
+import { readManualSales } from "@/infrastructure/google/manual-sales";
 
 export interface AdminDataRepository {
   listSales(): Promise<Sale[]>;
@@ -164,19 +165,30 @@ function parseReward(row: unknown[], rowNumber: number): RewardRedemption {
 
 export class GoogleAdminDataRepository implements AdminDataRepository {
   private readonly audit: AuditLogRepository;
+  private manualRead?: ReturnType<typeof readManualSales>;
+
+  private manual() {
+    // Coalesce concurrent sales/items reads, but do not cache across later requests.
+    if (!this.manualRead) {
+      const read = readManualSales(this.client);
+      this.manualRead = read;
+      void read.finally(() => { if (this.manualRead === read) this.manualRead = undefined; }).catch(() => undefined);
+    }
+    return this.manualRead;
+  }
 
   constructor(private readonly client: GoogleSheetsClient) {
     this.audit = new GoogleSheetsAuditLogRepository(client);
   }
 
   async listSales(): Promise<Sale[]> {
-    const rows = await this.read("sales", "A1:Q10000");
-    return rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => parseSale(row, index + 2));
+    const [rows, manual] = await Promise.all([this.read("sales", "A1:Q10000"), this.manual()]);
+    return [...rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => parseSale(row, index + 2)), ...manual.sales];
   }
 
   async listSaleItems(): Promise<SaleItem[]> {
-    const rows = await this.read("sale_items", "A1:H10000");
-    return rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => parseSaleItem(row, index + 2));
+    const [rows, manual] = await Promise.all([this.read("sale_items", "A1:H10000"), this.manual()]);
+    return [...rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => parseSaleItem(row, index + 2)), ...manual.items];
   }
 
   async listRewards(): Promise<RewardRedemption[]> {

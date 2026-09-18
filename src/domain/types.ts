@@ -26,6 +26,7 @@ export interface Product {
 }
 
 export interface Sale {
+  source?: "manual" | "app";
   eventId?: string | null;
   eventNameSnapshot?: string | null;
   saleId: string;

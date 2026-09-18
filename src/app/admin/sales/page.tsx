@@ -10,17 +10,21 @@ export default function SalesPage() {
   const [eventId, setEventId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [manualEntryUrl, setManualEntryUrl] = useState("");
   useEffect(() => {
     setEventId(new URLSearchParams(window.location.search).get("eventId") || "");
     Promise.all([fetch("/api/admin/sales"), fetch("/api/admin/events")]).then(async ([response, eventResponse]) => {
       const payload = await response.json(); const eventPayload = await eventResponse.json();
       if (!response.ok || !eventResponse.ok) throw new Error(payload.error?.message || eventPayload.error?.message || "読込に失敗しました");
       setSales(payload.data.sales); setEvents(eventPayload.data.events);
+      setManualEntryUrl(payload.data.manualEntryUrl || "");
     }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "読込に失敗しました")).finally(() => setLoading(false));
   }, []);
   const visible = sales.filter((sale) => !eventId || (eventId === "none" ? !sale.eventId : sale.eventId === eventId));
   const breakdown = buildSalesBreakdown(visible);
   return <><header className={styles.header}><h1>取引履歴・詳細</h1></header>
+    {manualEntryUrl && <p><a href={manualEntryUrl} target="_blank" rel="noreferrer">手入力売上シートを開く</a></p>}
+    <p>手入力売上の「確定」行も合算しています。手入力は1行＝1商品明細として件数に含みます。修正・取消は手入力売上シートで行い、この画面を再読み込みしてください。</p>
     <label className={styles.label} htmlFor="sales-event-filter">イベント</label>
     <select id="sales-event-filter" className={styles.select} value={eventId} onChange={(event) => setEventId(event.target.value)}><option value="">すべて</option><option value="none">イベント未設定</option>{events.map((event) => <option key={event.eventId} value={event.eventId}>{event.name}</option>)}</select>
     {error && <p className={styles.error} role="alert">{error}</p>}
@@ -43,6 +47,6 @@ export default function SalesPage() {
       </table></div> : <p>集計対象の商品売上はありません。</p>}
       <p className={salesStyles.detail}>金額構成率＝商品売上金額÷集計対象の商品売上合計、数量構成率＝商品販売数量÷集計対象の販売数量。小数第1位に丸めるため合計が100%にならない場合があります。</p>
     </section>}
-    <section className={styles.panel}><h2>取引一覧</h2>{loading ? <p>読み込み中…</p> : <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>日時（日本時間）</th><th>イベント</th><th>購入商品（販売時）</th><th>取引ID</th><th>状態</th><th>商品数</th><th>合計</th><th>支払方法</th><th>取消</th></tr></thead><tbody>{visible.map((sale) => <tr key={sale.saleId}><td>{new Date(sale.soldAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</td><td>{sale.eventNameSnapshot || "未設定"}</td><td>{sale.items.length ? <ul className={salesStyles.items}>{uniqueSaleItems(sale.items).map((item) => <li key={item.saleItemId}><strong>{item.productNameSnapshot || "商品名未記録"}</strong><span className={salesStyles.detail}>{item.unitPriceYen.toLocaleString()}円 × {item.quantity}個 = {item.lineTotalYen.toLocaleString()}円</span></li>)}</ul> : "商品明細なし"}</td><td className={salesStyles.id}>{sale.saleId}</td><td>{sale.saleStatus === "voided" ? "取消" : ({ completed: "確定", pending: "保存中", error: "保存エラー" }[sale.writeStatus])}</td><td>{uniqueSaleItems(sale.items).reduce((sum, item) => sum + item.quantity, 0)}</td><td>{sale.totalYen.toLocaleString()}円</td><td>{sale.paymentMethod === "cash" ? "現金" : "その他"}</td><td>{sale.saleStatus === "completed" && sale.writeStatus === "completed" ? <a href={`/admin/sales/${sale.saleId}/void`}>取消</a> : "—"}</td></tr>)}</tbody></table>{visible.length === 0 && <p>該当する取引はありません。</p>}</div>}</section>
+    <section className={styles.panel}><h2>取引一覧</h2>{loading ? <p>読み込み中…</p> : <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>日時（日本時間）</th><th>イベント</th><th>購入商品（販売時）</th><th>取引ID</th><th>状態</th><th>商品数</th><th>合計</th><th>支払方法</th><th>取消</th></tr></thead><tbody>{visible.map((sale) => <tr key={sale.saleId}><td>{new Date(sale.soldAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</td><td>{sale.eventNameSnapshot || "未設定"}</td><td>{sale.items.length ? <ul className={salesStyles.items}>{uniqueSaleItems(sale.items).map((item) => <li key={item.saleItemId}><strong>{item.productNameSnapshot || "商品名未記録"}</strong><span className={salesStyles.detail}>{item.unitPriceYen.toLocaleString()}円 × {item.quantity}個 = {item.lineTotalYen.toLocaleString()}円</span></li>)}</ul> : "商品明細なし"}</td><td className={salesStyles.id}>{sale.source === "manual" && <strong>手入力<br /></strong>}{sale.saleId}</td><td>{sale.saleStatus === "voided" ? "取消" : ({ completed: "確定", pending: "保存中", error: "保存エラー" }[sale.writeStatus])}</td><td>{uniqueSaleItems(sale.items).reduce((sum, item) => sum + item.quantity, 0)}</td><td>{sale.totalYen.toLocaleString()}円</td><td>{sale.paymentMethod === "cash" ? "現金" : "その他"}</td><td>{sale.source === "manual" ? "シートで取消" : sale.saleStatus === "completed" && sale.writeStatus === "completed" ? <a href={`/admin/sales/${sale.saleId}/void`}>取消</a> : "—"}</td></tr>)}</tbody></table>{visible.length === 0 && <p>該当する取引はありません。</p>}</div>}</section>
   </>;
 }

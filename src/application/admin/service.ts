@@ -129,6 +129,7 @@ export class AdminService {
     if (!normalizedReason || normalizedReason.length > 200) throw new AppError("VALIDATION_ERROR", { details: ["取消理由は1〜200文字で入力してください"] });
     const sale = await this.deps.data.findSaleById(saleId);
     if (!sale) throw new AppError("NOT_FOUND");
+    if (sale.source === "manual") throw new AppError("CONFLICT", { details: ["手入力売上シートで状態を「取消」に変更してください"] });
     if (sale.writeStatus !== "completed" || sale.saleStatus !== "completed") throw new AppError("CONFLICT", { details: ["未完了または取消済みの売上は取消できません"] });
     const now = this.now().toISOString();
     const updated: Sale = { ...sale, saleStatus: "voided", voidedAt: now, voidReason: normalizedReason, updatedAt: now };

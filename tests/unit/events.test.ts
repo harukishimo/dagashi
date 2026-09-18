@@ -11,6 +11,24 @@ const event: SalesEvent = { eventId: "11111111-1111-4111-8111-111111111111", nam
 const sale: Sale = { saleId: "22222222-2222-4222-8222-222222222222", requestId: "33333333-3333-4333-8333-333333333333", soldAt: "2026-09-18T00:00:00Z", writeStatus: "completed", saleStatus: "completed", totalYen: 100, paymentMethod: "cash", experienceStatus: "skipped", stampCount: 1, challengeSuccess: false, elapsedMs: null, voidedAt: null, voidReason: null, createdAt: "2026-09-18T00:00:00Z", updatedAt: "2026-09-18T00:00:00Z", eventId: event.eventId, eventNameSnapshot: event.name };
 
 describe("events", () => {
+  it("validates optional detail and target fields with safe limits", () => {
+    const input = { name: event.name, startDate: event.startDate, endDate: event.endDate };
+    expect(eventInputSchema.parse(input)).toMatchObject({ description: "", ageRange: "", targetAudience: "", expectedAttendance: null });
+    expect(eventInputSchema.parse({ ...input, description: " 親子のお祭り ", ageRange: "3〜12歳", targetAudience: "家族", expectedAttendance: 0 })).toMatchObject({ description: "親子のお祭り", expectedAttendance: 0 });
+    for (const expectedAttendance of [-1, 1.5, 1000001, "100"]) expect(eventInputSchema.safeParse({ ...input, expectedAttendance }).success).toBe(false);
+    expect(eventInputSchema.safeParse({ ...input, description: "あ".repeat(2001) }).success).toBe(false);
+  });
+  it("reads legacy events and persists new event details in dedicated columns", async () => {
+    const row = [event.eventId, event.name, event.startDate, event.endDate, event.createdAt, "active"];
+    const client = { getValues: vi.fn(async () => ({ values: [[...EVENT_HEADERS], [...row, "お祭り", "3〜12歳", "親子", "100"]] })), appendValues: vi.fn() };
+    const repository = new GoogleEventRepository(client as never);
+    expect(await repository.list()).toMatchObject([{ description: "お祭り", ageRange: "3〜12歳", targetAudience: "親子", expectedAttendance: 100 }]);
+    await repository.append({ ...event, description: "お祭り", ageRange: "3〜12歳", targetAudience: "親子", expectedAttendance: 100 });
+    expect(client.appendValues).toHaveBeenCalledWith("events!A:J", [[...row, "お祭り", "3〜12歳", "親子", "100"]], { uncertainWrite: true });
+    client.getValues.mockResolvedValue({ values: [EVENT_HEADERS.slice(0, 6), row] });
+    expect(await repository.list()).toMatchObject([{ description: "", expectedAttendance: null }]);
+    await expect(repository.append(event)).rejects.toMatchObject({ code: "SHEETS_UNAVAILABLE" });
+  });
   it("validates actual calendar dates and ordering", () => {
     expect(eventInputSchema.safeParse({ name: "a", startDate: "2026-02-30", endDate: "2026-03-01" }).success).toBe(false);
     expect(eventInputSchema.safeParse({ name: "a", startDate: "2026-09-20", endDate: "2026-09-19" }).success).toBe(false);

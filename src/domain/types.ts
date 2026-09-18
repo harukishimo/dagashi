@@ -46,6 +46,10 @@ export interface Sale {
 }
 
 export interface SalesEvent {
+  description?: string;
+  ageRange?: string;
+  targetAudience?: string;
+  expectedAttendance?: number | null;
   status?: "active" | "archived";
   eventId: string;
   name: string;

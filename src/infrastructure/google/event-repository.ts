@@ -4,15 +4,17 @@ import { eventInputSchema } from "@/domain/events";
 import { AppError } from "@/lib/errors";
 import type { GoogleSheetsClient } from "./sheets-client";
 
-export const EVENT_HEADERS = ["event_id", "name", "start_date", "end_date", "created_at", "status"] as const;
+export const EVENT_HEADERS = ["event_id", "name", "start_date", "end_date", "created_at", "status", "description", "age_range", "target_audience", "expected_attendance"] as const;
 export interface EventRepository { list(): Promise<SalesEvent[]>; append(event: SalesEvent): Promise<void>; archive?(eventId: string): Promise<void> }
 export class GoogleEventRepository implements EventRepository {
   constructor(private readonly client: GoogleSheetsClient) {}
   async list(): Promise<SalesEvent[]> {
-    const { values = [] } = await this.client.getValues("events!A1:F1000");
-    if (![5, 6].includes(values[0]?.length) || EVENT_HEADERS.slice(0, values[0]?.length).some((header, index) => values[0][index] !== header)) throw new AppError("SHEETS_UNAVAILABLE", { details: ["events header mismatch: イベント用シートを準備してください"] });
+    const { values = [] } = await this.client.getValues("events!A1:J1000");
+    if (![5, 6, 10].includes(values[0]?.length) || EVENT_HEADERS.slice(0, values[0]?.length).some((header, index) => values[0][index] !== header)) throw new AppError("SHEETS_UNAVAILABLE", { details: ["events header mismatch: イベント用シートを準備してください"] });
     return values.slice(1).filter((row) => row.some((value) => String(value).trim())).map((row) => {
-      const parsed = eventInputSchema.safeParse({ name: row[1], startDate: row[2], endDate: row[3] });
+      if (row.length > values[0].length) throw new AppError("SHEETS_UNAVAILABLE");
+      const rawAttendance = String(row[9] ?? "").trim();
+      const parsed = eventInputSchema.safeParse({ name: row[1], startDate: row[2], endDate: row[3], description: row[6] ?? "", ageRange: row[7] ?? "", targetAudience: row[8] ?? "", expectedAttendance: rawAttendance === "" ? null : /^\d+$/.test(rawAttendance) ? Number(rawAttendance) : NaN });
       if (!parsed.success || !z.string().uuid().safeParse(row[0]).success || !z.string().datetime().safeParse(row[4]).success) throw new AppError("SHEETS_UNAVAILABLE", { details: ["events row is invalid"] });
       const status = row[5] || "active";
       if (status !== "active" && status !== "archived") throw new AppError("SHEETS_UNAVAILABLE", { details: ["events status is invalid"] });
@@ -20,7 +22,9 @@ export class GoogleEventRepository implements EventRepository {
     });
   }
   async append(event: SalesEvent): Promise<void> {
-    await this.client.appendValues("events!A:F", [[event.eventId, event.name, event.startDate, event.endDate, event.createdAt, "active"]], { uncertainWrite: true });
+    const header = (await this.client.getValues("events!A1:J1")).values?.[0] ?? [];
+    if (header.length !== EVENT_HEADERS.length || EVENT_HEADERS.some((value, i) => header[i] !== value)) throw new AppError("SHEETS_UNAVAILABLE", { details: ["eventsのG〜J列（詳細・ターゲット）を準備してください"] });
+    await this.client.appendValues("events!A:J", [[event.eventId, event.name, event.startDate, event.endDate, event.createdAt, "active", event.description ?? "", event.ageRange ?? "", event.targetAudience ?? "", event.expectedAttendance == null ? "" : String(event.expectedAttendance)]], { uncertainWrite: true });
   }
   async archive(eventId: string): Promise<void> {
     await this.list();

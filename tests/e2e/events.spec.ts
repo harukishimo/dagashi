@@ -21,8 +21,15 @@ test("admin creates event, inspects its sales and stops future attribution", asy
   await page.getByLabel("イベント名").fill("秋祭り");
   await page.getByLabel("開始日").fill("2026-09-18");
   await page.getByLabel("終了日").fill("2026-09-19");
+  await page.getByLabel("イベントの内容・目的（任意）").fill("地域の親子向けのお祭り");
+  await page.getByLabel("対象年齢層（任意）").fill("3〜12歳");
+  await page.getByLabel("対象者・ターゲットの特徴（任意）").fill("近隣の親子連れ");
+  await page.getByLabel("想定来場者数（人・任意）").fill("100");
   await page.getByRole("button", { name: "イベントを登録" }).click();
   await expect(page.getByText("500円", { exact: true })).toBeVisible();
+  await page.getByText("秋祭りの詳細・ターゲット", { exact: true }).click();
+  await expect(page.getByText("地域の親子向けのお祭り", { exact: true })).toBeVisible();
+  await expect(page.getByText("100人", { exact: true })).toBeVisible();
   await page.screenshot({ path: "outputs/events-admin.png", fullPage: true });
   page.on("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "秋祭りを停止" }).click();

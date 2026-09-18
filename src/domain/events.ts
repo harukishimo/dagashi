@@ -6,7 +6,15 @@ export const eventDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((v
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, "存在する日付を入力してください");
-export const eventInputSchema = z.object({ name: z.string().trim().min(1).max(80), startDate: eventDateSchema, endDate: eventDateSchema }).strict().refine((event) => event.startDate <= event.endDate, "開始日は終了日以前にしてください");
+export const eventInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  startDate: eventDateSchema,
+  endDate: eventDateSchema,
+  description: z.string().trim().max(2000).optional().default(""),
+  ageRange: z.string().trim().max(120).optional().default(""),
+  targetAudience: z.string().trim().max(500).optional().default(""),
+  expectedAttendance: z.number().int().min(0).max(1_000_000).nullable().optional().default(null),
+}).strict().refine((event) => event.startDate <= event.endDate, "開始日は終了日以前にしてください");
 
 export function eventForSale(events: SalesEvent[], soldAt: string): SalesEvent | null {
   const date = new Date(soldAt);

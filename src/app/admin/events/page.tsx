@@ -5,6 +5,36 @@ import type { SalesEvent } from "@/domain/types";
 import styles from "@/components/admin/admin.module.css";
 
 type EventSummary = SalesEvent & { saleCount: number; totalYen: number };
+function EventDetailsEditor({ event, disabled, onSaved }: { event: EventSummary; disabled: boolean; onSaved: () => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    setSaving(true); setError(""); setMessage("");
+    try {
+      const response = await fetch(`/api/admin/events/${event.eventId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ description: data.get("description"), ageRange: data.get("ageRange"), targetAudience: data.get("targetAudience"), expectedAttendance: data.get("expectedAttendance") === "" ? null : Number(data.get("expectedAttendance")) }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.details?.join(" / ") || payload.error?.message || "保存できませんでした");
+      await onSaved(); setEditing(false); setMessage("詳細・ターゲットを更新しました");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "通信エラー。再読み込みして保存状態を確認してください"); }
+    finally { setSaving(false); }
+  }
+  return <>
+    {message && <p role="status">{message}</p>}{error && <p className={styles.error} role="alert">{error}</p>}
+    {editing ? <form onSubmit={save} className={styles.form} aria-label={`${event.name}のターゲット編集`}>
+      <label className={styles.label}>内容・目的<textarea className={styles.textarea} name="description" defaultValue={event.description || ""} maxLength={2000} disabled={saving} /></label>
+      <label className={styles.label}>対象年齢層<input className={styles.input} name="ageRange" defaultValue={event.ageRange || ""} maxLength={120} disabled={saving} /></label>
+      <label className={styles.label}>ターゲットの特徴<textarea className={styles.textarea} name="targetAudience" defaultValue={event.targetAudience || ""} maxLength={500} disabled={saving} /></label>
+      <label className={styles.label}>想定来場者数<input className={styles.input} name="expectedAttendance" type="number" min={0} max={1000000} step={1} defaultValue={event.expectedAttendance ?? ""} disabled={saving} /></label>
+      <p>期間・イベント名・売上は変更しません。個人情報は入力しないでください。</p>
+      <button className={styles.button} disabled={saving || disabled}>{saving ? "保存中…" : "変更を保存"}</button>
+      <button className={styles.button} type="button" disabled={saving} onClick={() => { setEditing(false); setError(""); }}>キャンセル</button>
+    </form> : <button className={styles.button} type="button" disabled={disabled} onClick={() => { setEditing(true); setMessage(""); setError(""); }}>詳細・ターゲットを編集</button>}
+  </>;
+}
 export default function EventsPage() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [error, setError] = useState("");
@@ -70,6 +100,7 @@ export default function EventsPage() {
           <dt>対象年齢層</dt><dd>{event.ageRange || "未設定"}</dd>
           <dt>ターゲットの特徴</dt><dd style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{event.targetAudience || "未設定"}</dd>
           <dt>想定来場者数</dt><dd>{event.expectedAttendance == null ? "未設定" : `${event.expectedAttendance.toLocaleString()}人`}</dd></dl>
+        <EventDetailsEditor event={event} disabled={busy} onSaved={load} />
       </details>)}
     </section>
   </>;

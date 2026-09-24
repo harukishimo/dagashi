@@ -1,11 +1,11 @@
 import { z } from "zod";
 import type { SalesEvent } from "@/domain/types";
-import { eventInputSchema } from "@/domain/events";
+import { eventInputSchema, eventDetailsSchema, type EventDetails } from "@/domain/events";
 import { AppError } from "@/lib/errors";
 import type { GoogleSheetsClient } from "./sheets-client";
 
 export const EVENT_HEADERS = ["event_id", "name", "start_date", "end_date", "created_at", "status", "description", "age_range", "target_audience", "expected_attendance"] as const;
-export interface EventRepository { list(): Promise<SalesEvent[]>; append(event: SalesEvent): Promise<void>; archive?(eventId: string): Promise<void> }
+export interface EventRepository { list(): Promise<SalesEvent[]>; append(event: SalesEvent): Promise<void>; archive?(eventId: string): Promise<void>; updateDetails?(eventId: string, details: EventDetails): Promise<void> }
 export class GoogleEventRepository implements EventRepository {
   constructor(private readonly client: GoogleSheetsClient) {}
   async list(): Promise<SalesEvent[]> {
@@ -33,5 +33,14 @@ export class GoogleEventRepository implements EventRepository {
     const index = values.findIndex((row, index) => index > 0 && row[0] === eventId);
     if (index < 1) throw new AppError("NOT_FOUND");
     await this.client.updateValues(`events!F${index + 1}`, [["archived"]]);
+  }
+  async updateDetails(eventId: string, input: EventDetails): Promise<void> {
+    z.string().uuid().parse(eventId);
+    const details = eventDetailsSchema.parse(input);
+    const { values = [] } = await this.client.getValues("events!A1:J1000");
+    if (values[0]?.length !== EVENT_HEADERS.length || EVENT_HEADERS.some((h, i) => values[0][i] !== h)) throw new AppError("SHEETS_UNAVAILABLE");
+    const index = values.findIndex((row, i) => i > 0 && row[0] === eventId);
+    if (index < 1) throw new AppError("NOT_FOUND");
+    await this.client.updateValues(`events!G${index + 1}:J${index + 1}`, [[details.description, details.ageRange, details.targetAudience, details.expectedAttendance == null ? "" : String(details.expectedAttendance)]]);
   }
 }

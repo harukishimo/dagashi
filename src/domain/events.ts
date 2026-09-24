@@ -2,6 +2,14 @@ import { z } from "zod";
 import type { SalesEvent } from "./types";
 import { AppError } from "@/lib/errors";
 
+export const eventDetailsSchema = z.object({
+  description: z.string().trim().max(2000),
+  ageRange: z.string().trim().max(120),
+  targetAudience: z.string().trim().max(500),
+  expectedAttendance: z.number().int().min(0).max(1_000_000).nullable(),
+}).strict();
+export type EventDetails = z.infer<typeof eventDetailsSchema>;
+
 export const eventDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   const date = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;

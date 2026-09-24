@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eventInputSchema, assertNoEventOverlap } from "@/domain/events";
+import { eventInputSchema, eventDetailsSchema, assertNoEventOverlap } from "@/domain/events";
 import { isCountedSale } from "@/domain/calculations";
 import { GoogleEventRepository, type EventRepository } from "@/infrastructure/google/event-repository";
 import { GoogleAdminDataRepository, type AdminDataRepository } from "./data";
@@ -36,6 +36,13 @@ export class EventsService {
     z.string().uuid().parse(eventId);
     if (!this.events.archive) throw new AppError("CONFLICT");
     await this.events.archive(eventId);
+  }
+  async updateDetails(eventId: string, input: unknown) {
+    z.string().uuid().parse(eventId);
+    const details = eventDetailsSchema.parse(input);
+    if (!this.events.updateDetails) throw new AppError("CONFLICT");
+    await this.events.updateDetails(eventId, details);
+    return details;
   }
 }
 export function createGoogleEventsService() {

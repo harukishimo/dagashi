@@ -9,6 +9,7 @@ interface ProductVisualProps {
   product: Pick<ChildProduct, "name" | "fallbackEmoji" | "imageUrl" | "imageUpdatedAt">;
   className?: string;
   showFallbackLabel?: boolean;
+  addAction?: { onClick: () => void; disabled: boolean };
 }
 
 export function withImageVersion(imageUrl: string, imageUpdatedAt?: string | null): string {
@@ -21,11 +22,11 @@ export function withImageVersion(imageUrl: string, imageUpdatedAt?: string | nul
  * Drive images are always served by the same-origin image route. If the route
  * is unavailable, the card keeps its dimensions and shows the product emoji.
  */
-export function ProductVisual({ product, className = "", showFallbackLabel = false }: ProductVisualProps): React.JSX.Element {
+export function ProductVisual({ product, className = "", showFallbackLabel = false, addAction }: ProductVisualProps): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   const showImage = Boolean(product.imageUrl) && !failed;
-  return (
-    <div className={`${styles.visual} ${className}`}>
+  const content = (
+    <>
       {showImage ? (
         <Image
           src={withImageVersion(product.imageUrl ?? "", product.imageUpdatedAt)}
@@ -42,6 +43,10 @@ export function ProductVisual({ product, className = "", showFallbackLabel = fal
         </span>
       )}
       {showFallbackLabel && !showImage && <span className={styles.visualLabel}>えもじで表示</span>}
-    </div>
+    </>
   );
+  if (addAction) {
+    return <button type="button" className={`${styles.visual} ${styles.visualAdd} ${className}`} aria-label={`${product.name}の画像から1個ふやす`} disabled={addAction.disabled} onClick={addAction.onClick}>{content}</button>;
+  }
+  return <div className={`${styles.visual} ${className}`}>{content}</div>;
 }

@@ -11,15 +11,16 @@ interface ProductCardProps {
 
 export function ProductCard({ product, quantity, onQuantityChange }: ProductCardProps): React.JSX.Element {
   const soldOut = product.status === "sold_out" || (product.stockQuantity != null && product.stockQuantity <= 0);
+  const max = soldOut ? 0 : Math.min(20, product.stockQuantity ?? 20);
   return (
     <article className={`${styles.productCard} ${soldOut ? styles.soldOut : quantity > 0 ? styles.productCardSelected : ""}`}>
       <span className={styles.categoryBadge}>{product.category}</span>
-      <ProductVisual product={product} />
+      <ProductVisual product={product} addAction={{ disabled: quantity >= max, onClick: () => { if (quantity < max) onQuantityChange(quantity + 1); } }} />
       <h2 className={styles.productName}>{product.name}</h2>
       <p className={styles.price}>{product.priceYen.toLocaleString("ja-JP")}円</p>
       {quantity > 0 && <span className={styles.selectionLabel}>かごに入っています</span>}
       {soldOut && <p className={styles.soldOutLabel}>売り切れ</p>}
-      <QuantityStepper productName={product.name} value={quantity} max={soldOut ? 0 : Math.min(20, product.stockQuantity ?? 20)} onChange={onQuantityChange} />
+      <QuantityStepper productName={product.name} value={quantity} max={max} onChange={onQuantityChange} />
     </article>
   );
 }

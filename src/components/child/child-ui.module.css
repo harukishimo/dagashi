@@ -451,6 +451,8 @@
 }
 
 .productCard:nth-child(4n + 2) .visual { background: #dff5ff; }
+.visualAdd { width: 100%; min-width: 0; padding: 0; }
+.visualAdd:not(:disabled):active { filter: brightness(.94); }
 .productCard:nth-child(4n + 3) .visual { background: #ffe3e7; }
 .productCard:nth-child(4n) .visual { background: #e4f7da; }
 
@@ -487,6 +489,7 @@
 
 .categoryBadge {
   position: absolute;
+  pointer-events: none;
   top: 26px;
   left: 26px;
   z-index: 1;

@@ -7,6 +7,7 @@ test("sold-out products stay visible and cannot be added", async ({ page }) => {
   await page.goto("/shop");
   await expect(page.getByText("売り切れ", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "売切チョコを1個ふやす" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "売切チョコの画像から1個ふやす" })).toBeDisabled();
   await expect(page.locator("article")).toHaveCSS("filter", "grayscale(1)");
 });
 
@@ -58,18 +59,27 @@ test("child flow shows product emoji fallback when Drive image is unavailable", 
   await expect(page.getByRole("button", { name: "[テスト] チョコスナックを1個ふやす" })).toBeVisible();
 });
 
-test("child can add one item and see the live cart total", async ({ page }) => {
+test("product image and plus add items, while minus alone removes them", async ({ page }) => {
   await page.route("**/api/products", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ products: [{ productId: "11111111-1111-4111-8111-111111111111", name: "[テスト] チョコスナック", priceYen: 30, category: "チョコ", fallbackEmoji: "🍫", imageUrl: null, imageUpdatedAt: null, displayOrder: 10 }] }),
+      body: JSON.stringify({ products: [{ productId: "11111111-1111-4111-8111-111111111111", name: "[テスト] チョコスナック", priceYen: 30, category: "チョコ", fallbackEmoji: "🍫", imageUrl: "/brand/dagashi-app-icon.png", imageUpdatedAt: null, displayOrder: 10, stockQuantity: 2 }] }),
     });
   });
   await page.goto("/");
   await page.getByRole("link", { name: "おかいものを はじめる" }).click();
-  await page.getByRole("button", { name: "[テスト] チョコスナックを1個ふやす" }).click();
+  const image = page.getByRole("button", { name: "[テスト] チョコスナックの画像から1個ふやす" });
+  const plus = page.getByRole("button", { name: "[テスト] チョコスナックを1個ふやす" });
+  await image.getByRole("img").click();
   await expect(page.getByRole("complementary", { name: "かごの合計" })).toContainText("かご 1こ");
+  await expect(page.getByRole("complementary", { name: "かごの合計" })).toContainText("30円");
+  await plus.click();
+  await expect(image).toBeDisabled();
+  await expect(plus).toBeDisabled();
+  await expect(page.getByRole("complementary", { name: "かごの合計" })).toContainText("60円");
+  await page.getByRole("button", { name: "[テスト] チョコスナックを1個へらす" }).click();
+  await expect(image).toBeEnabled();
   await expect(page.getByRole("complementary", { name: "かごの合計" })).toContainText("30円");
 });
 

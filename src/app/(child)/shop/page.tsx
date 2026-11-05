@@ -77,7 +77,7 @@ export default function ShopPage(): React.JSX.Element {
         <ChildHeader currentStep="choose" />
         <section aria-labelledby="shop-title">
           <h1 id="shop-title" className={styles.title}>ほしいおかしを えらんでね</h1>
-          <p className={styles.subtitle}>＋と−で かずを かえてみよう。</p>
+          <p className={styles.subtitle}>おかしの えか ＋で ふやして、−で へらせるよ。</p>
           {state === "loading" && <p className={styles.infoBox} role="status">おかしを よみこんでいます…</p>}
           {state === "error" && <InlineError>{message}<br />お店の人をよんで、もういちど読みこんでね。</InlineError>}
           {state === "empty" && <div className={styles.empty}><p>いまは えらべる おかしが ありません。<br />お店の人をよんでね。</p></div>}

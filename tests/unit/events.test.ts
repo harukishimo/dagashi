@@ -60,9 +60,9 @@ describe("events", () => {
     const client = { getValues: vi.fn(async () => ({ values: [[...SHEET_HEADERS.sales, "event_id", "event_name_snapshot"], saleRow(sale)] })), updateValues: vi.fn(async () => undefined) };
     const updated = { ...sale, saleStatus: "voided" as const };
     await new GoogleAdminDataRepository(client as never).updateSale(updated);
-    expect(client.updateValues).toHaveBeenLastCalledWith("sales!A2:Q2", [saleRow(updated)]);
+    expect(client.updateValues).toHaveBeenLastCalledWith("sales!A2:Q2", [saleRow(updated).slice(0, 17)]);
     await new GoogleSheetsSaleRepository(client as never).update(updated);
-    expect(client.updateValues).toHaveBeenLastCalledWith("sales!A2:Q2", [saleRow(updated)]);
+    expect(client.updateValues).toHaveBeenLastCalledWith("sales!A2:Q2", [saleRow(updated).slice(0, 17)]);
   });
   it("summarizes only counted sales and keeps archived history", async () => {
     const service = new EventsService({ list: async () => [{ ...event, status: "archived" }], append: async () => undefined }, { listSales: async () => [sale, { ...sale, writeStatus: "pending" }, { ...sale, saleStatus: "voided" }, { ...sale, eventId: null }] } as never);

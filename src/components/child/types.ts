@@ -30,6 +30,7 @@ export interface StoredCart {
 }
 
 export interface ProductsResponse {
+  shopDisplayMode?: "flat" | "price" | "category";
   data?: { products?: ChildProduct[] };
   products?: ChildProduct[];
   error?: { message?: string };

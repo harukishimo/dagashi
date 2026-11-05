@@ -35,6 +35,18 @@ class MemorySettings implements SettingsRepository {
 const fixedNow = () => new Date("2026-01-01T00:00:00.000Z");
 
 describe("SaleService", () => {
+  it("snapshots survey only when enabled and preserves the answer on replay", async () => {
+    const sales = new MemorySales();
+    let enabled = true;
+    const settings = { list: async () => [], find: async (key: string) => key === "customer_survey_enabled" ? { key, value: String(enabled), updatedAt: "now" } : null };
+    const service = new SaleService({ products: new MemoryProducts(), sales, settings, now: fixedNow });
+    const input = { requestId: "77777777-7777-4777-8777-777777777777", paymentMethod: "cash" as const, customerType: "family" as const, items: [{ productId: product.productId, quantity: 1 }] };
+    expect((await service.create(input)).sale.customerType).toBe("family");
+    expect((await service.create({ ...input, customerType: undefined, requestId: "77777777-7777-4777-8777-777777777779" })).sale.customerType).toBe("unregistered");
+    enabled = false;
+    expect((await service.create({ ...input, customerType: "adults" })).sale.customerType).toBe("family");
+    expect((await service.create({ ...input, requestId: "77777777-7777-4777-8777-777777777778" })).sale.customerType).toBe("unregistered");
+  });
   it("snapshots matching event and challenge off once, including replay", async () => {
     const sales = new MemorySales();
     let enabled = "false";

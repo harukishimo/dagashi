@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 
 import { createGoogleProductService } from "@/application/products/service";
 import { toAppError } from "@/lib/errors";
+import { readOperationSettings } from "@/application/operation-settings";
 
 export async function GET(): Promise<Response> {
   try {
-    const products = await createGoogleProductService().list({ activeOnly: true });
+    const [products, settings] = await Promise.all([createGoogleProductService().list({ activeOnly: true }), readOperationSettings()]);
     return NextResponse.json({
+      shopDisplayMode: settings.shopDisplayMode,
       products: products.map((product) => ({
         productId: product.productId,
         status: product.status,

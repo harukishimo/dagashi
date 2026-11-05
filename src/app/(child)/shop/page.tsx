@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChildHeader } from "@/components/child/ChildHeader";
 import { CartTotalBar } from "@/components/child/CartTotalBar";
 import { cartCount, cartItemsFromStored, cartTotal, createRequestId, readCart, updateCartItem, writeCart } from "@/components/child/cart-storage";
-import { fetchProducts } from "@/components/child/product-api";
+import { fetchProductCatalog } from "@/components/child/product-api";
 import { ProductCard } from "@/components/child/ProductCard";
 import type { ChildProduct, StoredCart } from "@/components/child/types";
 import { InlineError } from "@/components/common/InlineError";
@@ -15,11 +15,14 @@ export default function ShopPage(): React.JSX.Element {
   const [cart, setCart] = useState<StoredCart | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [displayMode, setDisplayMode] = useState<"flat" | "price">("flat");
 
   const load = async (signal?: AbortSignal) => {
     setState("loading");
     try {
-      const nextProducts = await fetchProducts(signal);
+      const catalog = await fetchProductCatalog(signal);
+      const nextProducts = catalog.products;
+      setDisplayMode(catalog.displayMode);
       setProducts(nextProducts);
       if (nextProducts.length === 0) setState("empty");
       else setState("ready");
@@ -50,6 +53,16 @@ export default function ShopPage(): React.JSX.Element {
   const quantities = useMemo(() => new Map(items.map((item) => [item.productId, item.quantity])), [items]);
   const total = cartTotal(items);
   const count = cartCount(items);
+  const groups = useMemo(() => {
+    const result = new Map<number, ChildProduct[]>();
+    for (const product of products) {
+      const group = result.get(product.priceYen) ?? [];
+      group.push(product);
+      result.set(product.priceYen, group);
+    }
+    return [...result.entries()].sort(([a], [b]) => a - b);
+  }, [products]);
+  const productGrid = (list: ChildProduct[]) => <div className={styles.grid} aria-label="販売中のおかし">{list.map(product => <ProductCard key={product.productId} product={product} quantity={quantities.get(product.productId) ?? 0} onQuantityChange={quantity => changeQuantity(product, quantity)} />)}</div>;
 
   const changeQuantity = (product: ChildProduct, quantity: number) => {
     const current = cart ?? { requestId: createRequestId(), items: [] };
@@ -69,11 +82,7 @@ export default function ShopPage(): React.JSX.Element {
           {state === "error" && <InlineError>{message}<br />お店の人をよんで、もういちど読みこんでね。</InlineError>}
           {state === "empty" && <div className={styles.empty}><p>いまは えらべる おかしが ありません。<br />お店の人をよんでね。</p></div>}
           {state === "ready" && (
-            <div className={styles.grid} aria-label="販売中のおかし">
-              {products.map((product) => (
-                <ProductCard key={product.productId} product={product} quantity={quantities.get(product.productId) ?? 0} onQuantityChange={(quantity) => changeQuantity(product, quantity)} />
-              ))}
-            </div>
+            displayMode === "price" ? <div>{groups.map(([price, list], index) => <section className={styles.productGroup} data-price-tone={index % 5} key={price} aria-label={`${price.toLocaleString("ja-JP")}円のおかし`}><h2 className={styles.groupTitle}><span className={styles.groupPrice}>{price.toLocaleString("ja-JP")}円</span>のおかし</h2>{productGrid(list)}</section>)}</div> : productGrid(products)
           )}
         </section>
       </div>

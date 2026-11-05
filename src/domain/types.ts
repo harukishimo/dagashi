@@ -1,3 +1,5 @@
+import type { CustomerType } from "./customer-survey";
+
 export type ProductStatus = "draft" | "active" | "sold_out" | "hidden";
 export type WriteStatus = "pending" | "completed" | "error";
 export type SaleStatus = "completed" | "voided";
@@ -26,6 +28,7 @@ export interface Product {
 }
 
 export interface Sale {
+  customerType?: CustomerType;
   source?: "manual" | "app";
   eventId?: string | null;
   eventNameSnapshot?: string | null;

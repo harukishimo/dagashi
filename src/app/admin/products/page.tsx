@@ -6,6 +6,7 @@ import Image from "next/image";
 
 import styles from "@/components/admin/admin.module.css";
 import type { Product } from "@/domain/types";
+import { selectProducts, type ProductSort } from "@/domain/product-list";
 
 type AdminProduct = Omit<Product, "imageFileId"> & {
   imageConfigured: boolean;
@@ -50,6 +51,12 @@ export default function AdminProductsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const [query, setQuery] = useState("");
+  const [price, setPrice] = useState("");
+  const [statuses, setStatuses] = useState<Product["status"][]>([]);
+  const [sort, setSort] = useState<ProductSort>("price_asc");
+  const visibleProducts = selectProducts(products, { query, price, statuses, sort });
+  const prices = [...new Set(products.map(product => product.priceYen))].sort((a, b) => a - b);
 
   async function load(): Promise<void> {
     const response = await fetch("/api/admin/products", { credentials: "same-origin" });
@@ -157,8 +164,17 @@ export default function AdminProductsPage() {
     </section>
     <section className={styles.panel} style={{ marginTop: 24 }}>
       <h2>登録済み商品・在庫一覧</h2>
+      <div className={styles.filters} role="search" aria-label="商品マスタ検索">
+        <label className={styles.label}>商品名で検索<input className={styles.input} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="名前の一部で検索" /></label>
+        <label className={styles.label}>販売価格<select className={styles.select} value={price} onChange={event => setPrice(event.target.value)}><option value="">すべての価格</option>{prices.map(value => <option key={value} value={value}>{value.toLocaleString()}円</option>)}</select></label>
+        <label className={styles.label}>並び順<select className={styles.select} value={sort} onChange={event => setSort(event.target.value as ProductSort)}><option value="price_asc">販売価格が安い順</option><option value="price_desc">販売価格が高い順</option><option value="display_order">表示順</option><option value="name">商品名順</option><option value="updated_desc">更新日時が新しい順</option></select></label>
+        <fieldset className={styles.filterStatuses}><legend>ステータス（複数選択可・未選択はすべて）</legend>{(Object.keys(STATUS_LABEL) as Product["status"][]).map(status => <label key={status} className={styles.choice}><input type="checkbox" checked={statuses.includes(status)} onChange={event => setStatuses(current => event.target.checked ? [...current, status] : current.filter(value => value !== status))} />{STATUS_LABEL[status]}</label>)}</fieldset>
+        <button className={`${styles.button} ${styles.buttonSecondary}`} type="button" onClick={() => { setQuery(""); setPrice(""); setStatuses([]); setSort("price_asc"); }}>検索条件をリセット</button>
+      </div>
+      <p role="status">{products.length}件中 {visibleProducts.length}件を表示</p>
+      <p>名前・価格・ステータスを組み合わせて検索できます。一覧の並び替えは子ども画面の表示順には影響しません。</p>
       <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>商品</th><th>画像</th><th>価格</th><th>状態</th><th>操作</th></tr></thead><tbody>
-        {products.map((product) => {
+        {visibleProducts.map((product) => {
           const showImage = product.imageUrl && !failedImages.has(product.productId);
           return <tr key={product.productId}>
             <td><div className={styles.productCell}><span className={styles.productThumb}>{showImage ? <Image src={product.imageUrl ?? ""} width={42} height={42} sizes="42px" unoptimized alt="" onError={() => imageFailed(product.productId)} /> : product.fallbackEmoji || "🍬"}</span><span>{product.name}</span></div></td>
@@ -169,6 +185,7 @@ export default function AdminProductsPage() {
           </tr>;
         })}
       </tbody></table></div>
+      {visibleProducts.length === 0 && <p>条件に一致する商品はありません。検索条件を変更してください。</p>}
       <p className={styles.notice} style={{ marginTop: 16 }}>削除は行わず、状態を「非表示」に変更して管理します。Drive画像が取得できない商品は絵文字に切り替わり、要確認として表示します。</p>
     </section>
   </>;

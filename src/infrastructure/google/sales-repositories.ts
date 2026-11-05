@@ -3,6 +3,7 @@ import type { Sale, SaleItem } from "@/domain/types";
 
 import { SHEET_HEADERS, type ProductRepository } from "./repositories";
 import type { GoogleSheetsClient } from "./sheets-client";
+import { CUSTOMER_TYPES } from "@/domain/customer-survey";
 
 export interface SaleRepository {
   findByRequestId(requestId: string): Promise<Sale | null>;
@@ -56,13 +57,14 @@ function integerRange(value: unknown, min: number, max: number, label: string, r
 
 export function toSale(row: unknown[], rowNumber: number): Sale {
   const expected = SHEET_HEADERS.sales;
-  if (row.length < expected.length || row.length > expected.length + 2) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} is invalid`] });
+  if (row.length < expected.length || row.length > expected.length + 3) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} is invalid`] });
   if (Boolean(nullableText(row[15])) !== Boolean(nullableText(row[16]))) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} event snapshot is incomplete`] });
   const elapsedText = nullableText(row[8]);
   const elapsedMs = elapsedText === null ? null : integerRange(elapsedText, 0, 60_000, "sales.elapsed_ms", rowNumber);
   const stampText = nullableText(row[10]);
   const stampCount = stampText === null ? null : integerRange(stampText, 1, 2, "sales.stamp_count", rowNumber) as 1 | 2;
   const sale: Sale = {
+    customerType: nullableText(row[17]) ? enumValue(row[17], CUSTOMER_TYPES, "sales.customer_type", rowNumber) : "unregistered",
     saleId: uuidValue(row[0], "sales.sale_id", rowNumber), requestId: uuidValue(row[1], "sales.request_id", rowNumber), soldAt: text(row[2]),
     writeStatus: enumValue(row[3], ["pending", "completed", "error"], "sales.write_status", rowNumber),
     saleStatus: enumValue(row[4], ["completed", "voided"], "sales.sale_status", rowNumber),
@@ -91,13 +93,13 @@ function toSaleItem(row: unknown[], rowNumber: number): SaleItem {
 }
 
 export function saleRow(sale: Sale): string[] {
-  return [sale.saleId, sale.requestId, sale.soldAt, sale.writeStatus, sale.saleStatus, String(sale.totalYen), sale.paymentMethod, sale.experienceStatus, sale.elapsedMs === null ? "" : String(sale.elapsedMs), sale.challengeSuccess === null ? "" : String(sale.challengeSuccess).toUpperCase(), sale.stampCount === null ? "" : String(sale.stampCount), sale.voidedAt ?? "", sale.voidReason ?? "", sale.createdAt, sale.updatedAt, sale.eventId ?? "", sale.eventNameSnapshot ?? ""];
+  return [sale.saleId, sale.requestId, sale.soldAt, sale.writeStatus, sale.saleStatus, String(sale.totalYen), sale.paymentMethod, sale.experienceStatus, sale.elapsedMs === null ? "" : String(sale.elapsedMs), sale.challengeSuccess === null ? "" : String(sale.challengeSuccess).toUpperCase(), sale.stampCount === null ? "" : String(sale.stampCount), sale.voidedAt ?? "", sale.voidReason ?? "", sale.createdAt, sale.updatedAt, sale.eventId ?? "", sale.eventNameSnapshot ?? "", sale.customerType ?? "unregistered"];
 }
 
 export function assertSalesHeader(row: unknown[], requireEvents = false): void {
   const headers = SHEET_HEADERS.sales;
   const baseValid = headers.every((header, index) => row[index] === header);
-  const extended = row.length === 17 && row[15] === "event_id" && row[16] === "event_name_snapshot";
+  const extended = (row.length === 17 || (row.length === 18 && row[17] === "customer_type")) && row[15] === "event_id" && row[16] === "event_name_snapshot";
   if (!baseValid || (!extended && (requireEvents || row.length !== 15))) throw new AppError("SHEETS_UNAVAILABLE", { details: ["sales header mismatch: イベント列の移行を確認してください"] });
 }
 
@@ -117,9 +119,11 @@ export class GoogleSheetsSaleRepository implements SaleRepository {
   }
 
   async appendPending(sale: Sale): Promise<void> {
-    const response = await this.client.getValues("sales!A1:Q1");
-    assertSalesHeader(response.values?.[0] ?? [], true);
-    await this.client.appendValues("sales!A:Q", [saleRow(sale)], { uncertainWrite: true });
+    const response = await this.client.getValues("sales!A1:R1");
+    const headers = response.values?.[0] ?? [];
+    assertSalesHeader(headers, true);
+    if (headers.length !== 18) throw new AppError("CONFLICT", { message: "売上シートの購入者属性列を初期化してください" });
+    await this.client.appendValues("sales!A:R", [saleRow(sale)], { uncertainWrite: true });
   }
 
   async appendItems(items: SaleItem[]): Promise<void> {
@@ -135,17 +139,17 @@ export class GoogleSheetsSaleRepository implements SaleRepository {
   }
 
   async update(sale: Sale): Promise<void> {
-    const response = await this.client.getValues("sales!A1:Q10000");
+    const response = await this.client.getValues("sales!A1:R10000");
     const rows = response.values ?? [];
     assertSalesHeader(rows[0] ?? []);
     const index = rows.findIndex((row, rowIndex) => rowIndex > 0 && text(row[0]) === sale.saleId);
     if (index < 1) throw new AppError("NOT_FOUND");
-    const extended = rows[0].length === 17;
-    await this.client.updateValues(`sales!A${index + 1}:${extended ? "Q" : "O"}${index + 1}`, [saleRow(sale).slice(0, extended ? 17 : 15)]);
+    const columns = rows[0].length;
+    await this.client.updateValues(`sales!A${index + 1}:${columns === 18 ? "R" : columns === 17 ? "Q" : "O"}${index + 1}`, [saleRow(sale).slice(0, columns)]);
   }
 
   private async listSales(): Promise<Sale[]> {
-    const response = await this.client.getValues("sales!A1:Q10000");
+    const response = await this.client.getValues("sales!A1:R10000");
     const rows = response.values ?? [];
     assertSalesHeader(rows[0] ?? []);
     return rows.slice(1).filter((row) => text(row[0]).trim() !== "").map((row, index) => toSale(row, index + 2));

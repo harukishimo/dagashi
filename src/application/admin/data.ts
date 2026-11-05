@@ -7,7 +7,7 @@ import {
   type AuditLogRepository,
 } from "@/infrastructure/google/repositories";
 import type { GoogleSheetsClient } from "@/infrastructure/google/sheets-client";
-import { assertSalesHeader } from "@/infrastructure/google/sales-repositories";
+import { assertSalesHeader, toSale, saleRow as persistedSaleRow } from "@/infrastructure/google/sales-repositories";
 import { readManualSales } from "@/infrastructure/google/manual-sales";
 
 export interface AdminDataRepository {
@@ -81,9 +81,10 @@ function assertHeader(sheet: keyof typeof SHEET_HEADERS, values: unknown[]): voi
 }
 
 function parseSale(row: unknown[], rowNumber: number): Sale {
-  if (row.length < 15 || row.length > 17) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} is invalid`] });
+  if (row.length < 15 || row.length > 18) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} is invalid`] });
   if (Boolean(nullableText(row[15])) !== Boolean(nullableText(row[16]))) throw new AppError("SHEETS_UNAVAILABLE", { details: [`sales row ${rowNumber} event snapshot is incomplete`] });
   return {
+    customerType: toSale(row, rowNumber).customerType,
     saleId: requiredUuid(row[0], "sales.sale_id", rowNumber),
     requestId: requiredUuid(row[1], "sales.request_id", rowNumber),
     soldAt: requiredText(row[2], "sales", rowNumber),
@@ -182,7 +183,7 @@ export class GoogleAdminDataRepository implements AdminDataRepository {
   }
 
   async listSales(): Promise<Sale[]> {
-    const [rows, manual] = await Promise.all([this.read("sales", "A1:Q10000"), this.manual()]);
+    const [rows, manual] = await Promise.all([this.read("sales", "A1:R10000"), this.manual()]);
     return [...rows.slice(1).filter((row) => row.some((value) => text(value).trim() !== "")).map((row, index) => parseSale(row, index + 2)), ...manual.sales];
   }
 
@@ -205,11 +206,11 @@ export class GoogleAdminDataRepository implements AdminDataRepository {
   }
 
   async updateSale(sale: Sale): Promise<void> {
-    const rows = await this.read("sales", "A1:Q10000");
+    const rows = await this.read("sales", "A1:R10000");
     const index = rows.findIndex((row, rowIndex) => rowIndex > 0 && text(row[0]) === sale.saleId);
     if (index < 1) throw new AppError("NOT_FOUND");
-    const extended = rows[0].length === 17;
-    await this.client.updateValues(`sales!A${index + 1}:${extended ? "Q" : "O"}${index + 1}`, [saleRow(sale).slice(0, extended ? 17 : 15)]);
+    const columns = rows[0].length;
+    await this.client.updateValues(`sales!A${index + 1}:${columns === 18 ? "R" : columns === 17 ? "Q" : "O"}${index + 1}`, [(columns === 18 ? persistedSaleRow(sale) : saleRow(sale)).slice(0, columns)]);
   }
 
   async appendReward(reward: RewardRedemption): Promise<void> {

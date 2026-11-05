@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/experience-settings", route => route.fulfill({ json: { data: { checkoutPinRequired: true, customerSurveyEnabled: false, shopDisplayMode: "flat", challengeEnabled: true } } }));
+});
 
 test("admin can turn the stopwatch off and on", async ({ page }) => {
   let enabled = "true";
@@ -9,7 +12,7 @@ test("admin can turn the stopwatch off and on", async ({ page }) => {
     await route.fulfill({ json: { data: { settings: { challenge_enabled: enabled }, appVersion: "test", spreadsheetSchemaVersion: "2", spreadsheetIdConfigured: true, driveFolderConfigured: true } } });
   });
   await page.goto("/admin/settings");
-  const toggle = page.getByRole("switch");
+  const toggle = page.getByRole("switch", { name: "購入後の10秒チャレンジ" });
   await expect(toggle).toBeChecked();
   await toggle.click();
   await expect(page.getByRole("status")).toContainText("設定を保存しました");

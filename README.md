@@ -80,6 +80,7 @@ Google APIの通常テストはモックRepositoryを使用します。実APIス
 
 ## 運用上の注意
 
+- 商品マスタの検索・並び替え、会計PIN確認、価格別グループ表示、購入者属性アンケートは [`docs/admin-operations-update.md`](docs/admin-operations-update.md) を参照してください。導入時に `node scripts/migrate-operations.mjs` で内容を確認し、管理担当者1名で `--apply` を付けて実行します。
 - イベントは管理画面の「イベント」から、販売開始前に名称・開始日・終了日を登録します。日本時間で期間内の新規売上へ自動で紐づきます。期間の重複は不可で、既存売上への遡及登録はしません。導入手順は [`docs/events.md`](docs/events.md) を参照してください。
 - 管理画面の設定で10秒チャレンジをオン・オフにできます。オフの会計は購入スタンプ1個で確定し、開始画面へ戻ります。設定は新規会計に適用されます。詳細は [`docs/challenge-setting.md`](docs/challenge-setting.md) を参照してください。
 - Drive画像は任意です。有効な画像を優先し、未設定・読込失敗時は商品ごとの`fallback_emoji`を表示します。

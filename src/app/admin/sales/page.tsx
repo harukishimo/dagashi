@@ -4,6 +4,7 @@ import styles from "@/components/admin/admin.module.css";
 import type { SalesEvent } from "@/domain/types";
 import { buildSalesBreakdown, uniqueSaleItems, type SaleWithItems } from "@/domain/sales-breakdown";
 import salesStyles from "./sales.module.css";
+import { customerSurveySummary, CUSTOMER_TYPE_LABELS } from "@/domain/customer-survey";
 export default function SalesPage() {
   const [sales, setSales] = useState<SaleWithItems[]>([]);
   const [events, setEvents] = useState<SalesEvent[]>([]);
@@ -22,12 +23,19 @@ export default function SalesPage() {
   }, []);
   const visible = sales.filter((sale) => !eventId || (eventId === "none" ? !sale.eventId : sale.eventId === eventId));
   const breakdown = buildSalesBreakdown(visible);
+  const survey = customerSurveySummary(visible);
   return <><header className={styles.header}><h1>取引履歴・詳細</h1></header>
     {manualEntryUrl && <p><a href={manualEntryUrl} target="_blank" rel="noreferrer">手入力売上シートを開く</a></p>}
     <p>手入力売上の「確定」行も合算しています。手入力は1行＝1商品明細として件数に含みます。修正・取消は手入力売上シートで行い、この画面を再読み込みしてください。</p>
     <label className={styles.label} htmlFor="sales-event-filter">イベント</label>
     <select id="sales-event-filter" className={styles.select} value={eventId} onChange={(event) => setEventId(event.target.value)}><option value="">すべて</option><option value="none">イベント未設定</option>{events.map((event) => <option key={event.eventId} value={event.eventId}>{event.name}</option>)}</select>
     {error && <p className={styles.error} role="alert">{error}</p>}
+    {!loading && !error && <section className={styles.panel} aria-labelledby="survey-summary-title" style={{ marginBlock: 24 }}>
+      <h2 id="survey-summary-title">購入者属性のアンケート結果</h2>
+      <p>選択中のイベントの確定取引を集計します。取消・保存中・保存エラーは除外します。過去の取引・手入力売上・未回答は「未登録」です。</p>
+      <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>購入者属性</th><th>取引件数</th><th>構成率（件数）</th><th>売上金額</th></tr></thead><tbody>{survey.map(row => <tr key={row.type}><th scope="row">{CUSTOMER_TYPE_LABELS[row.type]}</th><td>{row.count.toLocaleString()}件</td><td>{row.ratio.toFixed(1)}%</td><td>{row.totalYen.toLocaleString()}円</td></tr>)}</tbody></table></div>
+      <p>未登録を含む全確定取引が分母です。手入力は1商品明細を1件として数えます。集計はアンケートをオフにしても確認できます。</p>
+    </section>}
     {!loading && !error && <section className={styles.panel} aria-labelledby="product-breakdown-title">
       <h2 id="product-breakdown-title">商品別の売上内訳</h2>
       <p>選択中のイベントの確定売上を集計します。取消・保存中・保存エラーの取引は含みません。</p>

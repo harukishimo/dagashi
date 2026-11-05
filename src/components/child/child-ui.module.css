@@ -1,3 +1,15 @@
+.productGroup { --price-group-bg: #edf8f0; margin-top: 24px; padding: clamp(14px, 2.5vw, 26px); background: var(--price-group-bg); border: 2px solid var(--pop-ink); border-radius: 24px; }
+.productGroup[data-price-tone="1"] { --price-group-bg: #eaf5ff; }
+.productGroup[data-price-tone="2"] { --price-group-bg: #fff0f1; }
+.productGroup[data-price-tone="3"] { --price-group-bg: #f3efff; }
+.productGroup[data-price-tone="4"] { --price-group-bg: #fff6dd; }
+.groupTitle { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px; background: var(--surface); color: var(--pop-ink); border: 3px solid var(--pop-ink); border-radius: 16px; padding: 8px 18px; margin: 0; font-size: clamp(20px, 2.5vw, 28px); }
+.groupPrice { font-size: clamp(28px, 3.5vw, 42px); font-weight: 900; font-variant-numeric: tabular-nums; }
+.productGroup .grid { margin-top: 24px; }
+.survey { margin-top: 24px; border-radius: 16px; }
+.surveyOptions { display: flex; flex-wrap: wrap; gap: 12px; }
+.surveyChoice { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 14px; border: 2px solid var(--pop-ink); border-radius: 12px; cursor: pointer; }
+.surveyChoice:has(input:checked) { background: var(--pop-blue-soft); }
 .page {
   --primary: #e52335;
   --primary-hover: #c81429;

@@ -93,6 +93,7 @@ export const saleItemInputSchema = z.object({
 });
 
 export const saleInputSchema = z.object({
+  customerType: z.enum(["family", "children", "adults", "unregistered"]).default("unregistered"),
   requestId: UUID,
   paymentMethod: z.enum(["cash", "other"]),
   items: z.array(saleItemInputSchema).min(1).max(200),

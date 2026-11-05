@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { CustomerType } from "@/domain/customer-survey";
 
 import { calculateLineTotal, calculateSaleTotal, resultForElapsed, resultForInterrupt, resultForSkip, transitionChallenge } from "@/domain";
 import { saleInputSchema, challengeInputSchema } from "@/domain/validation";
@@ -15,6 +16,7 @@ import { eventForSale } from "@/domain/events";
 import { GoogleEventRepository, type EventRepository } from "@/infrastructure/google/event-repository";
 
 export interface CreateSaleInput {
+  customerType?: CustomerType;
   requestId: string;
   paymentMethod: "cash" | "other";
   items: SaleItemInput[];
@@ -82,10 +84,11 @@ export class SaleService {
     const saleId = randomUUID();
     const items = parsed.items.map((input) => this.buildItem(saleId, input, productMap));
     const now = this.now().toISOString();
-    const [events, challengeSetting] = await Promise.all([this.deps.events?.list() ?? [], this.deps.settings?.find("challenge_enabled")]);
+    const [events, challengeSetting, surveySetting] = await Promise.all([this.deps.events?.list() ?? [], this.deps.settings?.find("challenge_enabled"), this.deps.settings?.find("customer_survey_enabled")]);
     const event = eventForSale(events, now);
     const challengeEnabled = challengeSetting?.value.trim().toLowerCase() !== "false";
     const sale: Sale = {
+      customerType: surveySetting?.value.trim() === "true" ? parsed.customerType ?? "unregistered" : "unregistered",
       saleId, requestId: parsed.requestId, soldAt: now,
       writeStatus: "pending", saleStatus: "completed", totalYen: calculateSaleTotal(items), paymentMethod: parsed.paymentMethod,
       experienceStatus: challengeEnabled ? "challenge_pending" : "skipped", elapsedMs: null, challengeSuccess: challengeEnabled ? null : false, stampCount: challengeEnabled ? null : 1,

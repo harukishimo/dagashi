@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { OperationSettings } from "@/domain/operation-settings";
+import type { StoredCart } from "@/components/child/types";
+import { CUSTOMER_TYPES, CUSTOMER_TYPE_LABELS, type CustomerType } from "@/domain/customer-survey";
 import { ChildHeader } from "@/components/child/ChildHeader";
 import { cartItemsFromStored, cartTotal, clearCart, readCart } from "@/components/child/cart-storage";
 import { AsyncButton } from "@/components/common/AsyncButton";
@@ -11,7 +14,7 @@ import styles from "@/components/child/child-ui.module.css";
 
 export default function CheckoutPage(): React.JSX.Element {
   const router = useRouter();
-  const cart = useMemo(() => readCart(), []);
+  const [cart, setCart] = useState<StoredCart | null>(null);
   const items = useMemo(() => cartItemsFromStored(cart), [cart]);
   const total = cartTotal(items);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "other">("cash");
@@ -19,6 +22,27 @@ export default function CheckoutPage(): React.JSX.Element {
   const [error, setError] = useState("");
   const [authRequired, setAuthRequired] = useState(false);
   const [pin, setPin] = useState("");
+  const [settings, setSettings] = useState<OperationSettings | null>(null);
+  const [settingsError, setSettingsError] = useState("");
+  const [customerType, setCustomerType] = useState<CustomerType>("unregistered");
+  async function loadSettings(signal?: AbortSignal) {
+    setSettingsError("");
+    try {
+      const response = await fetch("/api/experience-settings", { signal, cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok || !body.data) throw new Error("会計設定を読み込めませんでした");
+      setSettings(body.data);
+    } catch (cause) {
+      if (signal?.aborted) return;
+      setSettingsError(cause instanceof Error ? cause.message : "会計設定を読み込めませんでした");
+    }
+  }
+  useEffect(() => {
+    setCart(readCart());
+    const controller = new AbortController();
+    void loadSettings(controller.signal);
+    return () => controller.abort();
+  }, []);
 
   const continueAfterSale = (sale: { saleId: string; experienceStatus?: string }) => {
     if (sale.experienceStatus === "skipped") {
@@ -45,11 +69,11 @@ export default function CheckoutPage(): React.JSX.Element {
   };
 
   const confirmPayment = async () => {
-    if (!cart || items.length === 0) return;
+    if (!cart || items.length === 0 || !settings) return;
     setPending(true);
     setError("");
     try {
-      const response = await fetch("/api/sales", { method: "POST", headers: { "content-type": "application/json", Origin: window.location.origin }, body: JSON.stringify({ requestId: cart.requestId, paymentMethod, items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })) }) });
+      const response = await fetch("/api/sales", { method: "POST", headers: { "content-type": "application/json", Origin: window.location.origin }, body: JSON.stringify({ requestId: cart.requestId, paymentMethod, customerType: settings.customerSurveyEnabled ? customerType : "unregistered", items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })) }) });
       const body = (await response.json()) as { data?: { saleId?: string; writeStatus?: string; experienceStatus?: string }; error?: { message?: string } };
       if (response.status === 401) {
         setAuthRequired(true);
@@ -94,6 +118,8 @@ export default function CheckoutPage(): React.JSX.Element {
           <h1 id="checkout-title" className={styles.title}>お店の人に 画面とおかしを みせてね</h1>
           <p className={styles.subtitle}>お店の人が おかねを うけとってから、売上を保存します。</p>
           {error && <InlineError>{error}<br />同じ画面から再試行できます。</InlineError>}
+          {settingsError && <InlineError>{settingsError}<button className={styles.secondaryButton} type="button" onClick={() => void loadSettings()}>設定を読み直す</button></InlineError>}
+          {!settings && !settingsError && <p role="status">会計の準備をしています…</p>}
           {items.length === 0 ? (
             <div className={styles.empty}><p>かごに おかしが ありません。<br /><Link className={styles.subtleLink} href="/shop">おかしを えらぶ</Link></p></div>
           ) : (
@@ -105,6 +131,7 @@ export default function CheckoutPage(): React.JSX.Element {
                 <label><input type="radio" name="payment-method" value="cash" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} /> 現金</label>
                 <label><input type="radio" name="payment-method" value="other" checked={paymentMethod === "other"} onChange={() => setPaymentMethod("other")} /> その他</label>
               </fieldset>
+              {settings?.customerSurveyEnabled && <fieldset className={styles.survey}><legend>だれと おかいものに きたかな？（任意）</legend><p>えらばなくても おかいもの できるよ。</p><div className={styles.surveyOptions}>{CUSTOMER_TYPES.map(type => <label key={type} className={styles.surveyChoice}><input type="radio" name="customer-type" value={type} checked={customerType === type} onChange={() => setCustomerType(type)} disabled={pending} />{CUSTOMER_TYPE_LABELS[type]}</label>)}</div></fieldset>}
               {authRequired && (
                 <div className={styles.infoBox}>
                   <h2>お店の人のそうさ</h2>
@@ -115,7 +142,7 @@ export default function CheckoutPage(): React.JSX.Element {
               )}
               <div className={styles.actions}>
                 <Link className={styles.secondaryButton} href="/cart">かごを えらびなおす</Link>
-                <AsyncButton className={styles.primaryButton} type="button" pending={pending} disabled={authRequired} pendingLabel="売上を保存しています…" onClick={() => void confirmPayment()}>支払済みにする</AsyncButton>
+                <AsyncButton className={styles.primaryButton} type="button" pending={pending} disabled={authRequired || !settings} pendingLabel="売上を保存しています…" onClick={() => void confirmPayment()}>支払済みにする</AsyncButton>
               </div>
             </div>
           )}

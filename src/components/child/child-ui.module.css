@@ -32,6 +32,19 @@
 .surveyOptions { display: flex; flex-wrap: wrap; gap: 12px; }
 .surveyChoice { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 14px; border: 2px solid var(--pop-ink); border-radius: 12px; cursor: pointer; }
 .surveyChoice:has(input:checked) { background: var(--pop-blue-soft); }
+.surveyCompact { margin: 0; min-width: 0; padding: 8px 14px 12px; }
+.surveyCompact legend { padding: 0 6px; font-size: 16px; font-weight: 800; }
+.surveyCompact .surveyOptions { gap: 8px; }
+.surveyCompact .surveyChoice { min-height: 44px; padding: 6px 12px; font-size: 16px; }
+.shopSurveySticky { position: sticky; top: var(--shop-survey-top, 12px); z-index: 10; margin-bottom: 24px; background: var(--pop-cream); border-radius: 20px; box-shadow: 0 5px 0 rgb(74 35 51 / 18%); }
+.shopWithSurvey { --shop-scroll-offset: calc(var(--shop-survey-top, 12px) + var(--shop-survey-height, 148px) + 16px); }
+.shopPage .productGroup,
+.shopWithSurvey :is(button, a, input, [tabindex]) { scroll-margin-top: var(--shop-scroll-offset, 80px); scroll-margin-bottom: 150px; }
+@media (max-width: 1000px) { .shopWithPriceNav { --shop-survey-top: 76px; } }
+@media (max-width: 480px) {
+  .surveyCompact .surveyOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .surveyCompact .surveyChoice { padding: 6px 8px; }
+}
 .page {
   --primary: #e52335;
   --primary-hover: #c81429;
@@ -57,6 +70,9 @@
   color: var(--pop-ink);
   font-family: "Hiragino Maru Gothic ProN", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
 }
+
+/* Clip the candy decorations without creating a scroll container that disables sticky positioning. */
+.shopPage { overflow: clip; }
 
 .page::before,
 .page::after {

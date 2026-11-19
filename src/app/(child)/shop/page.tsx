@@ -22,6 +22,19 @@ export default function ShopPage(): React.JSX.Element {
   const [surveyEnabled, setSurveyEnabled] = useState(false);
   const [activePrice, setActivePrice] = useState<number | null>(null);
   const groupElements = useRef(new Map<number, HTMLElement>());
+  const pageElement = useRef<HTMLElement>(null);
+  const surveyBar = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const bar = surveyBar.current;
+    const page = pageElement.current;
+    if (!bar || !page) return;
+    const measure = () => page.style.setProperty("--shop-survey-height", `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => { observer.disconnect(); page.style.removeProperty("--shop-survey-height"); };
+  }, [surveyEnabled, state]);
 
   const load = async (signal?: AbortSignal) => {
     setState("loading");
@@ -75,7 +88,7 @@ export default function ShopPage(): React.JSX.Element {
     let frame = 0;
     const updateActive = () => {
       frame = 0;
-      const marker = Math.min(180, window.innerHeight * .22);
+      const marker = Math.max(Math.min(180, window.innerHeight * .22), (surveyBar.current?.getBoundingClientRect().bottom ?? 0) + 16);
       let current = prices[0];
       for (const price of prices) {
         if ((groupElements.current.get(price)?.getBoundingClientRect().top ?? Infinity) <= marker) current = price;
@@ -110,14 +123,16 @@ export default function ShopPage(): React.JSX.Element {
   };
 
   return (
-    <main className={`${styles.page} ${displayMode === "price" && state === "ready" ? styles.shopWithPriceNav : ""}`}>
+    <main ref={pageElement} className={`${styles.page} ${styles.shopPage} ${surveyEnabled && state === "ready" ? styles.shopWithSurvey : ""} ${displayMode === "price" && state === "ready" ? styles.shopWithPriceNav : ""}`}>
       {displayMode === "price" && state === "ready" && <PriceNavigation prices={prices} activePrice={activePrice} onSelect={selectPrice} />}
       <div className={styles.pageInner}>
         <ChildHeader currentStep="choose" />
+        {surveyEnabled && state === "ready" && <div ref={surveyBar} className={styles.shopSurveySticky}>
+          <CustomerSurvey compact value={cart?.customerType ?? "unregistered"} onChange={changeCustomerType} />
+        </div>}
         <section aria-labelledby="shop-title">
           <h1 id="shop-title" className={styles.title}>ほしいおかしを えらんでね</h1>
           <p className={styles.subtitle}>おかしの えか ＋で ふやして、−で へらせるよ。</p>
-          {surveyEnabled && state === "ready" && <CustomerSurvey value={cart?.customerType ?? "unregistered"} onChange={changeCustomerType} />}
           {state === "loading" && <p className={styles.infoBox} role="status">おかしを よみこんでいます…</p>}
           {state === "error" && <InlineError>{message}<br />お店の人をよんで、もういちど読みこんでね。</InlineError>}
           {state === "empty" && <div className={styles.empty}><p>いまは えらべる おかしが ありません。<br />お店の人をよんでね。</p></div>}

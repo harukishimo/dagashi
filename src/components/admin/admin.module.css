@@ -20,6 +20,9 @@
 .buttonSecondary { background: #fff; color: var(--admin-ink, #172033); border: 1px solid var(--admin-border, #d8dee8); }
 .buttonDanger { background: #b3261e; }
 .form { display: grid; gap: 16px; max-width: 640px; }
+.bulkToolbar { position: sticky; top: 8px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; margin: 16px 0; background: #eef5ff; color: var(--admin-ink, #172033); border: 2px solid var(--admin-primary, #2457c5); border-radius: 10px; }
+.bulkToolbar p { max-width: 660px; margin: 8px 0; }
+.stockInput { width: 110px; text-align: right; }
 .actionRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .label { display: grid; gap: 6px; font-weight: 700; }
 .input, .select, .textarea { min-height: 44px; border: 1px solid #aeb8c8; border-radius: 8px; padding: 8px 10px; font: inherit; }

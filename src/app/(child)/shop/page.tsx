@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CustomerSurvey } from "@/components/child/CustomerSurvey";
+import { PriceNavigation } from "@/components/child/PriceNavigation";
+import type { CustomerType } from "@/domain/customer-survey";
 import { ChildHeader } from "@/components/child/ChildHeader";
 import { CartTotalBar } from "@/components/child/CartTotalBar";
 import { cartCount, cartItemsFromStored, cartTotal, createRequestId, readCart, updateCartItem, writeCart } from "@/components/child/cart-storage";
@@ -16,6 +19,9 @@ export default function ShopPage(): React.JSX.Element {
   const [state, setState] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [message, setMessage] = useState("");
   const [displayMode, setDisplayMode] = useState<"flat" | "price">("flat");
+  const [surveyEnabled, setSurveyEnabled] = useState(false);
+  const [activePrice, setActivePrice] = useState<number | null>(null);
+  const groupElements = useRef(new Map<number, HTMLElement>());
 
   const load = async (signal?: AbortSignal) => {
     setState("loading");
@@ -23,6 +29,7 @@ export default function ShopPage(): React.JSX.Element {
       const catalog = await fetchProductCatalog(signal);
       const nextProducts = catalog.products;
       setDisplayMode(catalog.displayMode);
+      setSurveyEnabled(catalog.surveyEnabled);
       setProducts(nextProducts);
       if (nextProducts.length === 0) setState("empty");
       else setState("ready");
@@ -62,6 +69,37 @@ export default function ShopPage(): React.JSX.Element {
     }
     return [...result.entries()].sort(([a], [b]) => a - b);
   }, [products]);
+  const prices = useMemo(() => groups.map(([price]) => price), [groups]);
+  useEffect(() => {
+    if (displayMode !== "price" || !prices.length) return;
+    let frame = 0;
+    const updateActive = () => {
+      frame = 0;
+      const marker = Math.min(180, window.innerHeight * .22);
+      let current = prices[0];
+      for (const price of prices) {
+        if ((groupElements.current.get(price)?.getBoundingClientRect().top ?? Infinity) <= marker) current = price;
+      }
+      if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4) current = prices[prices.length - 1];
+      setActivePrice(current);
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(updateActive); };
+    updateActive();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); };
+  }, [displayMode, prices]);
+
+  const selectPrice = (price: number) => {
+    const element = groupElements.current.get(price);
+    element?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    element?.focus({ preventScroll: true });
+  };
+
+  const changeCustomerType = (customerType: CustomerType) => {
+    const next = { ...(cart ?? { requestId: createRequestId(), items: [] }), customerType };
+    setCart(next); writeCart(next);
+  };
   const productGrid = (list: ChildProduct[]) => <div className={styles.grid} aria-label="販売中のおかし">{list.map(product => <ProductCard key={product.productId} product={product} quantity={quantities.get(product.productId) ?? 0} onQuantityChange={quantity => changeQuantity(product, quantity)} />)}</div>;
 
   const changeQuantity = (product: ChildProduct, quantity: number) => {
@@ -72,17 +110,19 @@ export default function ShopPage(): React.JSX.Element {
   };
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${displayMode === "price" && state === "ready" ? styles.shopWithPriceNav : ""}`}>
+      {displayMode === "price" && state === "ready" && <PriceNavigation prices={prices} activePrice={activePrice} onSelect={selectPrice} />}
       <div className={styles.pageInner}>
         <ChildHeader currentStep="choose" />
         <section aria-labelledby="shop-title">
           <h1 id="shop-title" className={styles.title}>ほしいおかしを えらんでね</h1>
           <p className={styles.subtitle}>おかしの えか ＋で ふやして、−で へらせるよ。</p>
+          {surveyEnabled && state === "ready" && <CustomerSurvey value={cart?.customerType ?? "unregistered"} onChange={changeCustomerType} />}
           {state === "loading" && <p className={styles.infoBox} role="status">おかしを よみこんでいます…</p>}
           {state === "error" && <InlineError>{message}<br />お店の人をよんで、もういちど読みこんでね。</InlineError>}
           {state === "empty" && <div className={styles.empty}><p>いまは えらべる おかしが ありません。<br />お店の人をよんでね。</p></div>}
           {state === "ready" && (
-            displayMode === "price" ? <div>{groups.map(([price, list], index) => <section className={styles.productGroup} data-price-tone={index % 5} key={price} aria-label={`${price.toLocaleString("ja-JP")}円のおかし`}><h2 className={styles.groupTitle}><span className={styles.groupPrice}>{price.toLocaleString("ja-JP")}円</span>のおかし</h2>{productGrid(list)}</section>)}</div> : productGrid(products)
+            displayMode === "price" ? <div>{groups.map(([price, list], index) => <section className={styles.productGroup} id={`price-${price}`} ref={element => { if (element) groupElements.current.set(price, element); else groupElements.current.delete(price); }} tabIndex={-1} data-price-tone={index % 5} key={price} aria-label={`${price.toLocaleString("ja-JP")}円のおかし`}><h2 className={styles.groupTitle}><span className={styles.groupPrice}>{price.toLocaleString("ja-JP")}円</span>のおかし</h2>{productGrid(list)}</section>)}</div> : productGrid(products)
           )}
         </section>
       </div>

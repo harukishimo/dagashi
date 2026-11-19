@@ -1,4 +1,5 @@
 import type { CartItem, ChildProduct, StoredCart } from "./types";
+import { CUSTOMER_TYPES } from "@/domain/customer-survey";
 
 export const CART_STORAGE_KEY = "dagashi:cart:v1";
 export const MAX_PRODUCT_QUANTITY = 20;
@@ -23,6 +24,7 @@ export function readCart(): StoredCart | null {
     if (typeof value.requestId !== "string" || !Array.isArray(value.items)) return null;
     return {
       requestId: value.requestId,
+      customerType: value.customerType && CUSTOMER_TYPES.includes(value.customerType) ? value.customerType : "unregistered",
       items: value.items.filter((item): item is StoredCart["items"][number] => {
         if (!item || typeof item !== "object") return false;
         const candidate = item as Record<string, unknown>;

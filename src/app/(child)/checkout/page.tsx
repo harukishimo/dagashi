@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { OperationSettings } from "@/domain/operation-settings";
 import type { StoredCart } from "@/components/child/types";
-import { CUSTOMER_TYPES, CUSTOMER_TYPE_LABELS, type CustomerType } from "@/domain/customer-survey";
+import type { CustomerType } from "@/domain/customer-survey";
+import { CustomerSurvey } from "@/components/child/CustomerSurvey";
 import { ChildHeader } from "@/components/child/ChildHeader";
-import { cartItemsFromStored, cartTotal, clearCart, readCart } from "@/components/child/cart-storage";
+import { cartItemsFromStored, cartTotal, clearCart, readCart, writeCart } from "@/components/child/cart-storage";
 import { AsyncButton } from "@/components/common/AsyncButton";
 import { InlineError } from "@/components/common/InlineError";
 import styles from "@/components/child/child-ui.module.css";
@@ -38,11 +39,21 @@ export default function CheckoutPage(): React.JSX.Element {
     }
   }
   useEffect(() => {
-    setCart(readCart());
+    const saved = readCart();
+    setCart(saved);
+    setCustomerType(saved?.customerType ?? "unregistered");
     const controller = new AbortController();
     void loadSettings(controller.signal);
     return () => controller.abort();
   }, []);
+
+  const changeCustomerType = (value: CustomerType) => {
+    setCustomerType(value);
+    if (cart) {
+      const next = { ...cart, customerType: value };
+      setCart(next); writeCart(next);
+    }
+  };
 
   const continueAfterSale = (sale: { saleId: string; experienceStatus?: string }) => {
     if (sale.experienceStatus === "skipped") {
@@ -131,7 +142,7 @@ export default function CheckoutPage(): React.JSX.Element {
                 <label><input type="radio" name="payment-method" value="cash" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} /> 現金</label>
                 <label><input type="radio" name="payment-method" value="other" checked={paymentMethod === "other"} onChange={() => setPaymentMethod("other")} /> その他</label>
               </fieldset>
-              {settings?.customerSurveyEnabled && <fieldset className={styles.survey}><legend>だれと おかいものに きたかな？（任意）</legend><p>えらばなくても おかいもの できるよ。</p><div className={styles.surveyOptions}>{CUSTOMER_TYPES.map(type => <label key={type} className={styles.surveyChoice}><input type="radio" name="customer-type" value={type} checked={customerType === type} onChange={() => setCustomerType(type)} disabled={pending} />{CUSTOMER_TYPE_LABELS[type]}</label>)}</div></fieldset>}
+              {settings?.customerSurveyEnabled && <CustomerSurvey value={customerType} onChange={changeCustomerType} disabled={pending} />}
               {authRequired && (
                 <div className={styles.infoBox}>
                   <h2>お店の人のそうさ</h2>

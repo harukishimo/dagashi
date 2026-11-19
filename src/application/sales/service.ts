@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { withInventoryLock } from "@/application/inventory-lock";
 import type { CustomerType } from "@/domain/customer-survey";
 
 import { calculateLineTotal, calculateSaleTotal, resultForElapsed, resultForInterrupt, resultForSkip, transitionChallenge } from "@/domain";
@@ -50,7 +51,7 @@ export class SaleService {
 
   async create(input: CreateSaleInput): Promise<CreateSaleResult> {
     const parsed = saleInputSchema.parse(input);
-    return this.withKeyLock("inventory", () => this.createLocked(parsed));
+    return withInventoryLock(() => this.createLocked(parsed));
   }
 
   /**

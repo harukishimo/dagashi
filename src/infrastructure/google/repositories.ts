@@ -1,6 +1,7 @@
 import { AppError } from "@/lib/errors";
 import { productRowSchema, validateProduct } from "@/domain/validation";
 import type { AuditLog, Product, Setting } from "@/domain/types";
+import { bulkStockSchema, type StockUpdate } from "@/domain/stock-update";
 
 import type { GoogleSheetsClient } from "./sheets-client";
 import { GoogleAdminDataRepository } from "@/application/admin/data";
@@ -44,6 +45,7 @@ export interface ProductRepository {
   findById(productId: string): Promise<Product | null>;
   create(product: Product): Promise<Product>;
   update(product: Product): Promise<Product>;
+  updateStocks?(updates: StockUpdate[], updatedAt: string): Promise<void>;
 }
 
 export interface SettingsRepository {
@@ -185,6 +187,32 @@ export class GoogleSheetsProductRepository implements ProductRepository {
     await this.client.updateValues(`products!A${rowIndex + 1}:K${rowIndex + 1}`, [productToRow(product)]);
     if (product.stockQuantity !== undefined) await this.saveStock(product);
     return product;
+  }
+
+  async updateStocks(input: StockUpdate[], updatedAt: string): Promise<void> {
+    const { updates } = bulkStockSchema.parse({ updates: input });
+    const rows = (await this.client.getValues("products!A1:L1000")).values ?? [];
+    assertHeader("products", (rows[0] ?? []).slice(0, 11));
+    if (text(rows[0]?.[11]) !== "stock_total") throw new AppError("SHEETS_UNAVAILABLE");
+    const consumed = await inventoryConsumption(this.client);
+    const writes: Array<{ range: string; values: string[][] }> = [];
+    for (const update of updates) {
+      const matches = rows.flatMap((row, index) => index > 0 && text(row[0]) === update.productId ? [index] : []);
+      if (matches.length !== 1) throw new AppError("CONFLICT", { message: "商品一覧が変わりました。一括編集をやり直してください" });
+      const index = matches[0];
+      const row = rows[index];
+      const raw = text(row[11]).trim();
+      const total = raw === "" ? null : Number(raw);
+      if (total !== null && (!Number.isSafeInteger(total) || total < 0)) throw new AppError("SHEETS_UNAVAILABLE");
+      const quantity = total === null ? null : total - (consumed.get(update.productId) ?? 0);
+      if (quantity !== update.expectedStockQuantity || text(row[10]) !== update.expectedUpdatedAt) {
+        throw new AppError("CONFLICT", { message: "編集中に在庫または商品情報が変わりました。キャンセルして一括編集をやり直してください" });
+      }
+      const nextTotal = update.stockQuantity === null ? "" : String(update.stockQuantity + (consumed.get(update.productId) ?? 0));
+      writes.push({ range: `products!K${index + 1}:L${index + 1}`, values: [[updatedAt, nextTotal]] });
+    }
+    // Validate every product before sending a single batch of stock-only cells.
+    await this.client.batchUpdateValues(writes);
   }
 
   private async saveStock(product: Product): Promise<void> {

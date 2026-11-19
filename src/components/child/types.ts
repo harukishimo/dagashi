@@ -1,3 +1,4 @@
+import type { CustomerType } from "@/domain/customer-survey";
 export type ProductStatus = "draft" | "active" | "sold_out" | "hidden";
 
 /** The small, client-safe product contract returned by GET /api/products. */
@@ -21,6 +22,7 @@ export interface CartItem {
 }
 
 export interface StoredCart {
+  customerType?: CustomerType;
   requestId: string;
   items: Array<{
     productId: string;
@@ -30,6 +32,7 @@ export interface StoredCart {
 }
 
 export interface ProductsResponse {
+  customerSurveyEnabled?: boolean;
   shopDisplayMode?: "flat" | "price" | "category";
   data?: { products?: ChildProduct[] };
   products?: ChildProduct[];

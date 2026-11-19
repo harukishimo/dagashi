@@ -95,6 +95,15 @@ export class GoogleSheetsClient {
     });
   }
 
+  async batchUpdateValues(data: Array<{ range: string; values: string[][] }>): Promise<void> {
+    // Do not automatically retry a stocktake after an uncertain response: other
+    // operators may have changed it in the meantime. Re-read before retrying.
+    await this.request<unknown>(`/${encodeURIComponent(this.options.spreadsheetId)}/values:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({ valueInputOption: "RAW", data }),
+    }, { retryable: false });
+  }
+
   private async request<T>(path: string, init: RequestInit = {}, options: { retryable?: boolean } = {}): Promise<T> {
     if (!this.options.tokenProvider) {
       throw new AppError("SHEETS_UNAVAILABLE", { message: "Google API credentials are not configured", status: 503 });

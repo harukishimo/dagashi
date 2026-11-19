@@ -9,6 +9,7 @@ export async function GET(): Promise<Response> {
     const [products, settings] = await Promise.all([createGoogleProductService().list({ activeOnly: true }), readOperationSettings()]);
     return NextResponse.json({
       shopDisplayMode: settings.shopDisplayMode,
+      customerSurveyEnabled: settings.customerSurveyEnabled,
       products: products.map((product) => ({
         productId: product.productId,
         status: product.status,

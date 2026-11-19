@@ -4,6 +4,8 @@ import { productInputSchema, validateProduct } from "@/domain/validation";
 import type { AuditLog, Product } from "@/domain/types";
 import { AppError } from "@/lib/errors";
 import { getServerEnv } from "@/config/env";
+import { bulkStockSchema } from "@/domain/stock-update";
+import { withInventoryLock } from "@/application/inventory-lock";
 
 import { GoogleAccessTokenProvider } from "@/infrastructure/google/auth";
 import { GoogleDriveImageClient, type DriveImageRepository } from "@/infrastructure/google/drive-client";
@@ -111,6 +113,19 @@ export class ProductService {
     await this.deps.products.update({ ...product, stockQuantity: parsed.stockQuantity });
     await this.deps.audit.append(toAudit({ action: "product.update", targetType: "product", targetId: product.productId, summary: `商品を更新: ${product.name}` }, this.now()));
     return { product, imageWarning: imageResolution.warning };
+  }
+
+  async updateStocks(input: unknown): Promise<{ updatedCount: number; warning?: string }> {
+    const { updates } = bulkStockSchema.parse(input);
+    return withInventoryLock(async () => {
+      if (!this.deps.products.updateStocks) throw new AppError("CONFLICT");
+      await this.deps.products.updateStocks(updates, this.now().toISOString());
+      let warning: string | undefined;
+      try {
+        await this.deps.audit.append(toAudit({ action: "inventory.bulk_update", targetType: "product", targetId: "bulk", summary: `${updates.length}商品の現在庫を一括更新` }, this.now()));
+      } catch { warning = "在庫は保存しましたが、操作履歴を記録できませんでした"; }
+      return { updatedCount: updates.length, warning };
+    });
   }
 
   private async resolveImage(source: string | null | undefined): Promise<{ visual?: { fileId: string; updatedAt: string }; warning?: string }> {
